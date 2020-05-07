@@ -14,5 +14,9 @@ def get_table(name):
 
 @database_sync_to_async
 def set_table(name, state):
-    pass
-
+    try:
+        the_table = Table.objects.get(name=name)
+    except Table.DoesNotExist:
+        the_table = Table(name=name)
+    the_table.state = json.dumps(state)
+    the_table.save()

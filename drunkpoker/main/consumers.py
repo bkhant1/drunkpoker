@@ -73,7 +73,7 @@ class PlayerActions(AsyncHttpConsumer):
 
         table_name = self.scope["url_route"]["kwargs"]["table_name"]
         table_group_name = 'table_%s' % table_name
-        import pdb; pdb.set_trace()
+
         new_state = engine.process_event(
             await state.get_table(table_name),
             {

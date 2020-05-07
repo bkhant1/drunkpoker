@@ -34,15 +34,15 @@ port tableNameReceiver : (String -> msg) -> Sub msg
 
 
 type alias Model =
-  { draft : String
-  , messages : List String
+  { playerName : String
   , baseUrl : String
+  , state: String
   }
 
 
 init : () -> ( Model, Cmd Msg )
 init flags =
-  ( { draft = "", messages = [], baseUrl = "" }
+  ( { state = "", playerName = "", baseUrl = "" }
   , Cmd.none
   )
 
@@ -52,9 +52,7 @@ init flags =
 
 
 type Msg
-  = DraftChanged String
-  | Send
-  | Recv String
+  = Recv String
   | Bet
   | TableName String
   | Discard (Result Http.Error ())
@@ -67,16 +65,8 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        DraftChanged draft ->
-            ( { model | draft = draft }
-            , Cmd.none
-            )
-        Send ->
-            ( { model | draft = "" }
-            , sendMessage model.draft
-            )
         Recv message ->
-            ( { model | messages = model.messages ++ [message] }
+            ( { model | state = message }
             , Cmd.none
             )
         Bet ->
@@ -88,6 +78,7 @@ update msg model =
                 <| Encode.object
                     [ ("amount", Encode.int 42)
                     , ("player_name", Encode.string "Quentin")
+                    , ("seat_number", Encode.string "3")
                     ]
                 }
             )
@@ -120,26 +111,8 @@ subscriptions _ =
 view : Model -> Html Msg
 view model =
   div []
-    [ h1 [] [ text "Echo Chat" ]
-    , ul []
-        (List.map (\msg -> li [] [ text msg ]) model.messages)
-    , input
-        [ type_ "text"
-        , placeholder "Draft"
-        , onInput DraftChanged
-        , on "keydown" (ifIsEnter Send)
-        , value model.draft
+    [ h1 [] [ text "Poker" ]
+    , div []
+        [ button [ onClick Bet ] [ text "Bet" ]
         ]
-        []
-    , button [ onClick Send ] [ text "Send" ]
-    , button [ onClick Bet ] [ text "Bet" ]
     ]
-
-
-
--- DETECT ENTER
-
-ifIsEnter : msg -> D.Decoder msg
-ifIsEnter msg =
-  D.field "key" D.string
-    |> D.andThen (\key -> if key == "Enter" then D.succeed msg else D.fail "some other key")
