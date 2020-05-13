@@ -1,5 +1,5 @@
 from drunkpoker.main.models import Table
-from drunkpoker.main.engine import initial_state
+from drunkpoker.main.engine import initial_state, is_table_empty
 from channels.db import database_sync_to_async
 import json
 
@@ -19,4 +19,9 @@ def set_table(name, state):
     except Table.DoesNotExist:
         the_table = Table(name=name)
     the_table.state = json.dumps(state)
-    the_table.save()
+    if is_table_empty(state):
+        print("Deleting (or not saving) table as no player on it")
+        the_table.delete()
+    else:
+        the_table.save()
+

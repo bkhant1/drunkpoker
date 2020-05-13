@@ -55,7 +55,7 @@ class JoinTable(AsyncHttpConsumer):
 class PlayerActions(AsyncHttpConsumer):
 
     EVENT_TYPE_FROM_URL_ACTION = {
-        "bet": engine.Event.PLAYER_SIT
+        "sit": engine.Event.PLAYER_SIT
     }
 
     def event_type(self):
@@ -67,9 +67,11 @@ class PlayerActions(AsyncHttpConsumer):
         """
         :param body: bytes for a valid json containing the action parameters
         """
+        player_id = self.scope["session"].session_key
+
         print(
             f'Received action {self.scope["url_route"]["kwargs"]}, with body: {body}, player session id: ' +
-            f'{self.scope["session"].session_key}')
+            f'{player_id}')
 
         table_name = self.scope["url_route"]["kwargs"]["table_name"]
         table_group_name = 'table_%s' % table_name
@@ -78,7 +80,7 @@ class PlayerActions(AsyncHttpConsumer):
             await state.get_table(table_name),
             {
                 "type": self.event_type(),
-                "player_id": self.scope["cookies"]["sessionid"],
+                "player_id": player_id,
                 "parameters": json.loads(body)
             }
         )
@@ -105,6 +107,10 @@ class PlayerActions(AsyncHttpConsumer):
 class StreamGameState(AsyncWebsocketConsumer):
 
     async def connect(self):
+        player_id = self.scope["session"].session_key
+
+        print(f'Player connected: {player_id}')
+
         self.table_name = self.scope['url_route']['kwargs']['table_name']
         self.table_group_name = 'table_%s' % self.table_name
 
@@ -114,9 +120,49 @@ class StreamGameState(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
+        await self.send(text_data=json.dumps(
+            engine.strip_state_for_player(
+                await state.get_table(self.table_name),
+                player_id
+            )
+        ))
 
     async def disconnect(self, close_code):
-        pass
+        try:
+            player_id = self.scope["cookies"]["sessionid"]
+
+            print(f"Player leaving {player_id}")
+
+            new_state = engine.process_event(
+                await state.get_table(self.table_name),
+                {
+                    "type": engine.Event.PLAYER_LEAVE,
+                    "player_id": player_id,
+                }
+            )
+            await state.set_table(
+                self.table_name,
+                new_state
+            )
+            await self.channel_layer.group_send(
+                self.table_group_name,
+                {
+                    'type': 'game_state_updated',
+                    'message': json.dumps(
+                        engine.strip_state_for_player(new_state, player_id)
+                    )
+                }
+            )
+        except engine.EventRejected as e:
+            print(e)
 
     async def game_state_updated(self, text_data):
-        await self.send(text_data=text_data["message"])
+        player_id = self.scope["cookies"]["sessionid"]
+        #print(f'Streaming state to {player_id}')
+
+        state = json.loads(text_data["message"])
+        new_state = engine.strip_state_for_player(state, player_id)
+
+        text_state_to_send = json.dumps(new_state)
+        print(text_state_to_send)
+        await self.send(text_data=text_state_to_send)

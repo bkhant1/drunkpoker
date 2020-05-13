@@ -11,5 +11,5 @@ http_urlpatterns = [
 
 
 websocket_patterns = [
-    re_path(r'^ws/table/(?P<table_name>\w+)', consumers.StreamGameState),
+    re_path(r'^ws/table/(?P<table_name>\w+)', consumers.StreamGameState)
 ]
