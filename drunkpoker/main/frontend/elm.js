@@ -9805,9 +9805,10 @@ var $elm$browser$Browser$element = _Browser_element;
 var $author$project$Main$Sitting = function (a) {
 	return {$: 'Sitting', a: a};
 };
+var $author$project$Main$baseUrl = 'http://localhost:1234/';
 var $author$project$Main$initFromBeforeSit = _Utils_Tuple2(
 	{
-		baseUrl: 'http://localhost:1234/table/abc',
+		baseUrl: $author$project$Main$baseUrl + 'table/abc',
 		gameState: {
 			seats: $elm$core$Dict$fromList(
 				_List_fromArray(
@@ -12440,7 +12441,7 @@ var $author$project$Main$update = F2(
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{baseUrl: 'http://localhost:1234/table/' + tableName}),
+						{baseUrl: $author$project$Main$baseUrl + ('table/' + tableName)}),
 					$elm$core$Platform$Cmd$none);
 			case 'Discard':
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
@@ -12936,7 +12937,7 @@ var $author$project$Main$renderPlayer = F3(
 		var cardsOffset = 1;
 		var cardsLeft = 1.8;
 		var cardToUrl = function (card) {
-			return 'http://localhost:1234/static/cards/' + ($author$project$Main$cardToFilename(card) + '.svg');
+			return $author$project$Main$baseUrl + ('static/cards/' + ($author$project$Main$cardToFilename(card) + '.svg'));
 		};
 		var cardProportion = 0.32;
 		var cardLeft2 = $rtfeldman$elm_css$Css$left(
@@ -13007,8 +13008,8 @@ var $author$project$Main$renderPlayer = F3(
 				if (_v2.$ === 'Playing') {
 					return _List_fromArray(
 						[
-							A2(renderCard, cardLeft1, 'http://localhost:1234/static/cards/1B.svg'),
-							A2(renderCard, cardLeft2, 'http://localhost:1234/static/cards/1B.svg')
+							A2(renderCard, cardLeft1, $author$project$Main$baseUrl + 'static/cards/1B.svg'),
+							A2(renderCard, cardLeft2, $author$project$Main$baseUrl + 'static/cards/1B.svg')
 						]);
 				} else {
 					return _List_Nil;
@@ -13053,7 +13054,7 @@ var $author$project$Main$renderPlayer = F3(
 								_List_fromArray(
 									[
 										$rtfeldman$elm_css$Html$Styled$Attributes$src(
-										'http://localhost:1234/static/avatar' + ($elm$core$String$fromInt(mySeatNumber) + '.png')),
+										$author$project$Main$baseUrl + ('static/avatar' + ($elm$core$String$fromInt(mySeatNumber) + '.png'))),
 										$rtfeldman$elm_css$Html$Styled$Attributes$css(
 										_List_fromArray(
 											[

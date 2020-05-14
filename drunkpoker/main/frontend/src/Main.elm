@@ -14,6 +14,10 @@ import Svg.Styled as Svg
 import Svg.Styled.Attributes exposing (cx, cy, fill, rx, ry)
 
 
+baseUrl: String
+-- baseUrl = "https://obscure-shore-25002.herokuapp.com/"
+baseUrl= "http://localhost:1234/"
+
 
 -- MAIN
 
@@ -92,14 +96,14 @@ makeEmptySeat seatNumber =
 
 initWithObama =
     (
-        { baseUrl = "http://localhost:1234/table/abc"
+        { baseUrl = baseUrl ++ "table/abc"
         , gameState =
             { seats = Dict.fromList
                 [(1,Just { name = "Hey", state=Playing }),(2,Just {name = "Hey", state=Playing}),(3,Just { name = "Hey", state=Playing }),(4,Nothing),(5,Just { name = "Hey", state=Playing }),(6,Nothing),(7,Nothing),(8,Nothing),(9,Nothing),(10,Nothing)] }
             , playerName = "Hey !"
             , playerState = Playing }
     , Http.post
-        { url = "http://localhost:1234/table/abc/actions/sit"
+        { url = baseUrl ++ "table/abc/actions/sit"
         , expect = Http.expectWhatever Discard
         , body = Http.jsonBody
             <| Encode.object
@@ -109,7 +113,7 @@ initWithObama =
         }
     )
 initFromBeforeSit =
-    ( { baseUrl = "http://localhost:1234/table/abc", gameState = { seats = Dict.fromList [(1,Nothing),(2,Nothing),(3,Nothing),(4,Nothing),(5,Nothing),(6,Nothing)] }, playerName = "Hello", playerState = Sitting 1 }
+    ( { baseUrl = baseUrl ++ "table/abc", gameState = { seats = Dict.fromList [(1,Nothing),(2,Nothing),(3,Nothing),(4,Nothing),(5,Nothing),(6,Nothing)] }, playerName = "Hello", playerState = Sitting 1 }
     , Cmd.none
     )
 realInit =
@@ -231,7 +235,7 @@ update msg model =
             , Cmd.none
             )
         TableName tableName ->
-            ( { model | baseUrl = "http://localhost:1234/table/" ++ tableName }
+            ( { model | baseUrl = baseUrl ++ "table/" ++ tableName }
             , Cmd.none
             )
         Discard _ ->
@@ -398,7 +402,7 @@ renderPlayer player position mySeatNumber =
             [ Css.width (Css.vw <| cardProportion*cardHeight)
             , Css.height (Css.vh <| cardHeight)
             ]
-        cardToUrl = \card -> "http://localhost:1234/static/cards/" ++ cardToFilename card ++ ".svg"
+        cardToUrl = \card -> baseUrl ++ "static/cards/" ++ cardToFilename card ++ ".svg"
         renderCard cardLeftPos url =
             div
                 [ css
@@ -427,8 +431,8 @@ renderPlayer player position mySeatNumber =
                 Nothing ->
                     case player.state of
                         Playing _ ->
-                            [ renderCard cardLeft1 "http://localhost:1234/static/cards/1B.svg"
-                            , renderCard cardLeft2 "http://localhost:1234/static/cards/1B.svg"
+                            [ renderCard cardLeft1 <| baseUrl ++ "static/cards/1B.svg"
+                            , renderCard cardLeft2 <| baseUrl ++ "static/cards/1B.svg"
                             ]
                         _ ->
                             []
@@ -445,7 +449,7 @@ renderPlayer player position mySeatNumber =
                 ]
             ]
             [ img
-                 [ src <| "http://localhost:1234/static/avatar" ++ String.fromInt mySeatNumber ++ ".png"
+                 [ src <| baseUrl ++ "static/avatar" ++ String.fromInt mySeatNumber ++ ".png"
                  , css
                      [ Css.height (Css.pct 100)
                      , Css.width (Css.pct 100)
