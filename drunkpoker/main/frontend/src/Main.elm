@@ -15,8 +15,8 @@ import Svg.Styled.Attributes exposing (cx, cy, fill, rx, ry)
 
 
 baseUrl: String
--- baseUrl = "https://obscure-shore-25002.herokuapp.com/"
-baseUrl= "http://localhost:1234/"
+baseUrl = "https://obscure-shore-25002.herokuapp.com/"
+--baseUrl= "http://localhost:1234/"
 
 
 -- MAIN

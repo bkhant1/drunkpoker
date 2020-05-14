@@ -9805,7 +9805,7 @@ var $elm$browser$Browser$element = _Browser_element;
 var $author$project$Main$Sitting = function (a) {
 	return {$: 'Sitting', a: a};
 };
-var $author$project$Main$baseUrl = 'http://localhost:1234/';
+var $author$project$Main$baseUrl = 'https://obscure-shore-25002.herokuapp.com/';
 var $author$project$Main$initFromBeforeSit = _Utils_Tuple2(
 	{
 		baseUrl: $author$project$Main$baseUrl + 'table/abc',
