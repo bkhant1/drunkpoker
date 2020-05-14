@@ -1,0 +1,26 @@
+{
+  "flop": [],
+  "seats": {
+    "1": "eyJwbGF5ZXJfam9pbmVkIjp0cnVlfQ:1jXPCn:2Fhd-rTDWCmwl0kPExYSl_tWmIE",
+    "2": "",
+    "3": "",
+    "4": "",
+    "5": "",
+    "6": "",
+    "7": "",
+    "8": "",
+    "9": "",
+    "10": ""
+  },
+  "turn_to": -1,
+  "players": {
+    "eyJwbGF5ZXJfam9pbmVkIjp0cnVlfQ:1jXPCn:2Fhd-rTDWCmwl0kPExYSl_tWmIE": {
+      "name": "Paul",
+      "state": "WAITING_NEW_GAME"
+    }
+  },
+  "game_state": "NOT_STARTED",
+  "dealing": "",
+  "small_blind": 1,
+  "big_blind": 2
+}
