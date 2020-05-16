@@ -27,9 +27,13 @@ var app = Elm.Main.init({
 
 // Create your WebSocket.
 var socket = new WebSocket(
-    'wss://obscure-shore-25002.herokuapp.com/ws/table/<TABLE_NAME>');
+    window.location.protocol === "https:" ? 'wss://' : 'ws://'
+    + window.location.host
+    + '/ws/table/<TABLE_NAME>');
 
-app.ports.tableNameReceiver.send("<TABLE_NAME>");
+app.ports.tableNameReceiver.send(
+    window.location.origin
+    + "/table/<TABLE_NAME>");
 
 // When a message comes into our WebSocket, we pass the message along
 // to the `messageReceiver` port.

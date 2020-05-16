@@ -226,6 +226,321 @@ def ongoing_game_with_three_players():
 
 
 @pytest.fixture
+def ongoing_game_with_three_players_all_in_game():
+    return {
+        'deck': engine.deck,
+        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'seats': {
+            "1": "",
+            "2": "",
+            "3": "abcd1234",
+            "4": "other_id",
+            "5": "",
+            "6": "other_other_id",
+        },
+        'dealing': "3",
+        'players': {
+            "abcd1234": {
+                "state": engine.PlayerState.MY_TURN,
+                "name": "Paul",
+                "committed_by": 1,
+                "cards": "doesn't matter"
+            },
+            "other_id": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Jean",
+                "committed_by": 2,
+                "cards": "doesn't matter"
+            },
+            "other_other_id": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 10,
+                "cards": "doesn't matter"
+            }
+        },
+        'game_state': engine.GameState.FLOP,
+        'small_blind': 1,
+        'big_blind': 2
+    }
+
+
+@pytest.fixture
+def ongoing_game_all_called_turn_to_small_blind():
+    return {
+        'deck': engine.deck,
+        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'seats': {
+            "1": "",
+            "2": "",
+            "3": "abcd1234",
+            "4": "other_id",
+            "5": "",
+            "6": "other_other_id",
+        },
+        'dealing': "3",
+        'players': {
+            "abcd1234": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Paul",
+                "committed_by": 2,
+                "cards": "doesn't matter"
+            },
+            "other_id": {
+                "state": engine.PlayerState.MY_TURN,
+                "name": "Jean",
+                "committed_by": 1,
+                "cards": "doesn't matter"
+            },
+            "other_other_id": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 2,
+                "cards": "doesn't matter"
+            }
+        },
+        'game_state': engine.GameState.FLOP,
+        'small_blind': 1,
+        'big_blind': 2
+    }
+
+
+@pytest.fixture
+def ongoing_game_all_called_turn_to_big_blind():
+    return {
+        'deck': engine.deck,
+        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'seats': {
+            "1": "",
+            "2": "",
+            "3": "abcd1234",
+            "4": "other_id",
+            "5": "",
+            "6": "other_other_id",
+        },
+        'dealing': "3",
+        'players': {
+            "abcd1234": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Paul",
+                "committed_by": 10,
+                "cards": "doesn't matter"
+            },
+            "other_id": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Jean",
+                "committed_by": 10,
+                "cards": "doesn't matter"
+            },
+            "other_other_id": {
+                "state": engine.PlayerState.MY_TURN,
+                "name": "Louis",
+                "committed_by": 2,
+                "cards": "doesn't matter"
+            }
+        },
+        'game_state': engine.GameState.FLOP,
+        'small_blind': 1,
+        'big_blind': 2
+    }
+
+
+@pytest.fixture
+def ongoing_game_partially_called_partially_folded():
+    return {
+        'deck': engine.deck,
+        'seats': {
+            "1": "P1",
+            "2": "P2",
+            "3": "",
+            "4": "P3",
+            "5": "P4",
+            "6": "P5",
+        },
+        'dealing': "3",
+        'players': {
+            "P1": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Paul",
+                "committed_by": 1,  # Small blind
+                "cards": "doesn't matter"
+            },
+            "P2": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Jean",
+                "committed_by": 2,  # Big blind
+                "cards": "doesn't matter"
+            },
+            "P3": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 5,
+                "cards": "doesn't matter"
+            },
+            "P4": {
+                "state": engine.PlayerState.FOLDED,
+                "name": "Louis",
+                "cards": "doesn't matter"
+            },
+            "P5": {
+                "state": engine.PlayerState.MY_TURN,
+                "name": "Louis",
+                "cards": "doesn't matter"
+            }
+        },
+        'game_state': engine.GameState.PREFLOP,
+        'small_blind': 1,
+        'big_blind': 2
+    }
+
+
+@pytest.fixture
+def ongoing_game_partially_called_partially_folded_last_call():
+    return {
+        'deck': engine.deck,
+        'seats': {
+            "1": "P1",
+            "2": "P2",
+            "3": "",
+            "4": "P3",
+            "5": "P4",
+            "6": "P5",
+        },
+        'dealing': "3",
+        'players': {
+            "P1": {
+                "state": engine.PlayerState.FOLDED,
+                "name": "Paul",
+                "committed_by": 1,  # Small blind
+                "cards": "doesn't matter"
+            },
+            "P2": {
+                "state": engine.PlayerState.MY_TURN,
+                "name": "Jean",
+                "committed_by": 2,  # Big blind
+                "cards": "doesn't matter"
+            },
+            "P3": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 5,
+                "cards": "doesn't matter"
+            },
+            "P4": {
+                "state": engine.PlayerState.FOLDED,
+                "name": "Louis",
+                "cards": "doesn't matter"
+            },
+            "P5": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 5,
+                "cards": "doesn't matter"
+            }
+        },
+        'game_state': engine.GameState.FLOP,
+        'small_blind': 1,
+        'big_blind': 2
+    }
+
+
+
+
+@pytest.fixture
+def ongoing_game_with_player_waiting():
+    return {
+        'deck': engine.deck,
+        'seats': {
+            "1": "P1",
+            "2": "P2",
+            "3": "",
+            "4": "P3",
+            "5": "P4",
+            "6": "",
+        },
+        'dealing': "5",
+        'players': {
+            "P1": {
+                "state": engine.PlayerState.MY_TURN,
+                "name": "Paul",
+                "committed_by": 1,  # Small blind
+                "cards": "doesn't matter"
+            },
+            "P2": {
+                "state": engine.PlayerState.WAITING_NEW_GAME,
+                "name": "Jean",
+                "cards": "doesn't matter"
+            },
+            "P3": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 2,  # Big blind
+                "cards": "doesn't matter"
+            },
+            "P4": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 2,
+                "cards": "doesn't matter"
+            },
+        },
+        'game_state': engine.GameState.FLOP,
+        'small_blind': 1,
+        'big_blind': 2
+    }
+
+
+@pytest.fixture
+def ongoing_game_all_folded():
+    return {
+        'deck': engine.deck,
+        'seats': {
+            "1": "P1",
+            "2": "P2",
+            "3": "",
+            "4": "P3",
+            "5": "P4",
+            "6": "P5",
+        },
+        'dealing': "3",
+        'players': {
+            "P1": {
+                "state": engine.PlayerState.FOLDED,
+                "name": "Paul",
+                "committed_by": 1,  # Small blind
+                "cards": "doesn't matter"
+            },
+            "P2": {
+                "state": engine.PlayerState.MY_TURN,
+                "name": "Jean",
+                "committed_by": 4,  # Big blind
+                "cards": "doesn't matter"
+            },
+            "P3": {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Louis",
+                "committed_by": 10,
+                "cards": "doesn't matter"
+            },
+            "P4": {
+                "state": engine.PlayerState.FOLDED,
+                "name": "Louis",
+                "cards": "doesn't matter"
+            },
+            "P5": {
+                "state": engine.PlayerState.FOLDED,
+                "name": "Louis",
+                "committed_by": 4,
+                "cards": "doesn't matter"
+            }
+        },
+        'game_state': engine.GameState.FLOP,
+        'small_blind': 1,
+        'big_blind': 2
+    }
+
+
+@pytest.fixture
 def ongoing_game_with_three_players_one_waiting(ongoing_game_with_three_players):
     ongoing_game_with_three_players["players"]["other_id"]["state"] = engine.PlayerState.WAITING_NEW_GAME
     return ongoing_game_with_three_players
@@ -743,3 +1058,156 @@ class TestStripStateForPlayer:
         new_state = engine.strip_state_for_player(state_to_strip(), "id3")
         assert "cards" not in new_state["players"]["id1"]
         assert "cards" not in new_state["players"]["id2"]
+
+
+class TestFold:
+
+    def test_fold_2_players_not_her_turn(self, ongoing_game_with_two_players):
+        old_state = copy.deepcopy(ongoing_game_with_two_players)
+        with pytest.raises(engine.EventRejected):
+            engine.fold_player(ongoing_game_with_two_players, "other_id")
+        assert ongoing_game_with_two_players == old_state
+
+    def test_fold_unknown_player(self, ongoing_game_with_three_players):
+        old_state = copy.deepcopy(ongoing_game_with_three_players)
+        with pytest.raises(engine.EventRejected):
+            engine.fold_player(ongoing_game_with_three_players, "other_id")
+        assert ongoing_game_with_three_players == old_state
+
+    def test_fold_2_players_her_turn(self, ongoing_game_with_two_players):
+        event, new_state = engine.fold_player(ongoing_game_with_two_players, "abcd1234")
+        assert new_state["game_state"] == engine.GameState.GAME_OVER
+        assert new_state["results"] == {
+            "winner": "other_id",
+            "drinkers": {
+                "abcd1234": 1
+            }
+        }
+        assert event is None
+
+    def test_fold_3_players(self, ongoing_game_with_three_players_all_in_game):
+        previous_game_state = ongoing_game_with_three_players_all_in_game["game_state"]
+        event, new_state = engine.fold_player(
+            ongoing_game_with_three_players_all_in_game,
+            "abcd1234"
+        )
+        assert event is None
+        assert new_state["game_state"] == previous_game_state
+        assert new_state["players"]["other_id"]["state"] == engine.PlayerState.MY_TURN
+        assert new_state["players"]["abcd1234"]["state"] == engine.PlayerState.FOLDED
+
+    def test_fold_turn_to_small_blind_all_called(self, ongoing_game_all_called_turn_to_small_blind):
+        previous_game_state = ongoing_game_all_called_turn_to_small_blind["game_state"]
+        event, new_state = engine.fold_player(
+            ongoing_game_all_called_turn_to_small_blind,
+            "other_id"
+        )
+        assert event is None
+        assert new_state["game_state"] == previous_game_state
+        assert new_state["players"]["other_id"]["state"] == engine.PlayerState.FOLDED
+        assert new_state["players"]["other_other_id"]["state"] == engine.PlayerState.MY_TURN
+
+    def test_fold_turn_to_big_blind_all_called(self, ongoing_game_all_called_turn_to_big_blind):
+        event, new_state = engine.fold_player(
+            ongoing_game_all_called_turn_to_big_blind,
+            "other_other_id"
+        )
+        assert event == engine.Event.DRAW_RIVER
+        assert new_state["players"]["abcd1234"]["state"] == engine.PlayerState.IN_GAME
+        assert new_state["players"]["other_id"]["state"] == engine.PlayerState.IN_GAME
+        assert new_state["players"]["other_other_id"]["state"] == engine.PlayerState.FOLDED
+
+    def test_fold_skip_player_waiting(self, ongoing_game_with_player_waiting):
+        event, new_state = engine.fold_player(
+            ongoing_game_with_player_waiting,
+            "P1"
+        )
+        assert new_state["players"]["P2"]["state"] == engine.PlayerState.WAITING_NEW_GAME
+        assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
+
+    def test_fold_partially_called_partially_folded(self, ongoing_game_partially_called_partially_folded):
+        old_game_state = ongoing_game_partially_called_partially_folded["game_state"]
+        event, new_state = engine.fold_player(
+            ongoing_game_partially_called_partially_folded,
+            "P5"
+        )
+        assert event is None
+        assert new_state["game_state"] == old_game_state
+        assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
+        assert new_state["players"]["P5"]["state"] == engine.PlayerState.FOLDED
+
+    def test_fold_game_over_big_table(self, ongoing_game_all_folded):
+        event, new_state = engine.fold_player(
+            ongoing_game_all_folded,
+            "P2"
+        )
+        assert event is None
+        assert new_state["game_state"] == engine.GameState.GAME_OVER
+        assert new_state["results"] == {
+            "winner": "P3",
+            "drinkers": {
+                "P1": 1,
+                "P2": 4,
+                "P5": 4
+            }
+        }
+
+    def test_fold_next_step_big_table(self, ongoing_game_partially_called_partially_folded_last_call):
+        event, new_state = engine.fold_player(
+            ongoing_game_partially_called_partially_folded_last_call,
+            "P2"
+        )
+        assert event is engine.Event.DRAW_RIVER
+        assert new_state["players"]["P2"]["state"] == engine.PlayerState.FOLDED
+        assert new_state["players"]["P3"]["state"] == engine.PlayerState.IN_GAME
+
+
+class TestListOfPlayerIdsStartingAtDealer:
+
+    @pytest.mark.parametrize(
+        "dealer, expected",
+        [
+            ("1", ["id1", "id2", "id3"]),
+            ("2", ["id2", "id3", "id1"]),
+            ("3", ["id3", "id1", "id2"])
+        ])
+    def test_no_holes(self, dealer, expected):
+        seats = {
+            "1": "id1",
+            "2": "id2",
+            "3": "id3"
+        }
+        assert expected == engine.list_of_players_ids_starting_at_dealer(
+            seats,
+            dealer
+        )
+
+    @pytest.mark.parametrize(
+        "dealer, expected",
+        [
+            ("1", ["id1", "id2", ""]),
+            ("2", ["id2", "", "id1"]),
+            ("3", ["", "id1", "id2"])
+        ])
+    def test_with_holes(self, dealer, expected):
+        seats = {
+            "1": "id1",
+            "2": "id2",
+            "3": "",
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

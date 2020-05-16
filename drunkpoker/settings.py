@@ -26,7 +26,8 @@ SECRET_KEY = '@$4l!ltb&sk_xhvl7&i9j9pm#gxj29nsny=g5q#w!uixg^)(o#'
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "obscure-shore-25002.herokuapp.com"
+    "obscure-shore-25002.herokuapp.com",
+    "localhost"
 ]
 
 

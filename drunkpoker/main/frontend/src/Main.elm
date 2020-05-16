@@ -14,8 +14,8 @@ import Svg.Styled as Svg
 import Svg.Styled.Attributes exposing (cx, cy, fill, rx, ry)
 
 
-baseUrl: String
-baseUrl = "https://obscure-shore-25002.herokuapp.com/"
+--baseUrl: String
+--baseUrl = "https://obscure-shore-25002.herokuapp.com/"
 --baseUrl= "http://localhost:1234/"
 
 
@@ -44,6 +44,7 @@ port tableNameReceiver : (String -> msg) -> Sub msg
 type alias JsonState =
     { seats: Dict String String
     , players: Dict String JsonPlayer
+    , gameState: String
     }
 
 
@@ -51,16 +52,22 @@ type alias JsonPlayer =
     { name: String
     , state: String
     , cards: Maybe (List Card)
+    , committedBy: Maybe Int
     }
 
 
 type alias SeatNumber = Int
 
 
+type SubState =
+    MyTurn
+    | InGame
+    | Folded
+
+
 type UiPlayerState =
     Iddle SeatNumber
-    | Sitting SeatNumber
-    | Playing SeatNumber
+    | Playing SeatNumber SubState
     | WaitingNextGame SeatNumber
 
 
@@ -74,60 +81,65 @@ type alias Player =
     { name: String
     , state: UiPlayerState
     , cards: Maybe (Card, Card)
+    , committedBy: Maybe Int
     }
+
+
+type EnumGameState =
+    Progressing
+    | GameOver
 
 
 type alias GameState =
     { seats: Dict SeatNumber (Maybe Player)
+    , gameState: EnumGameState
     }
+
+
+type Seated =
+    Not
+    | PickingName SeatNumber
+    | Seated SeatNumber
 
 
 type alias Model =
   { playerName: String
   , baseUrl: String
+  , hostName: String
   , gameState: GameState
-  , playerState: UiPlayerState
+  , seated: Seated
   }
+
+
+getSeatNumber: Seated -> Maybe SeatNumber
+getSeatNumber seated =
+    case seated of
+        Seated seatNo -> Just seatNo
+        _ -> Nothing
 
 
 makeEmptySeat: SeatNumber -> (SeatNumber, Maybe Player)
 makeEmptySeat seatNumber =
     (seatNumber, Nothing)
 
-initWithObama =
-    (
-        { baseUrl = baseUrl ++ "table/abc"
-        , gameState =
-            { seats = Dict.fromList
-                [(1,Just { name = "Hey", state=Playing }),(2,Just {name = "Hey", state=Playing}),(3,Just { name = "Hey", state=Playing }),(4,Nothing),(5,Just { name = "Hey", state=Playing }),(6,Nothing),(7,Nothing),(8,Nothing),(9,Nothing),(10,Nothing)] }
-            , playerName = "Hey !"
-            , playerState = Playing }
-    , Http.post
-        { url = baseUrl ++ "table/abc/actions/sit"
-        , expect = Http.expectWhatever Discard
-        , body = Http.jsonBody
-            <| Encode.object
-                [ ("player_name", Encode.string "Obama")
-                , ("seat_number", Encode.int 1)
-                ]
-        }
-    )
-initFromBeforeSit =
-    ( { baseUrl = baseUrl ++ "table/abc", gameState = { seats = Dict.fromList [(1,Nothing),(2,Nothing),(3,Nothing),(4,Nothing),(5,Nothing),(6,Nothing)] }, playerName = "Hello", playerState = Sitting 1 }
-    , Cmd.none
-    )
+
 realInit =
-    { gameState =
+    ( { gameState =
         { seats =
             Dict.fromList <| List.map makeEmptySeat <| List.range 1 6
+        , gameState = Progressing
         }
-    , playerName = ""
-    , baseUrl = ""
-    , playerState = Iddle
-    }
+      , playerName = ""
+      , baseUrl = ""
+      , seated = Not
+      , hostName = "?"
+      }
+    , Cmd.none
+    )
+
 
 init : () -> ( Model, Cmd Msg )
-init flags = initFromBeforeSit
+init flags = realInit
   --( initWithObama
   --, Cmd.none
   --)
@@ -139,7 +151,8 @@ init flags = initFromBeforeSit
 
 type Msg
   = Recv String
-  | Bet
+  | PrepareRaise
+  | Fold
   | TableName String
   | Discard (Result Http.Error ())
   | EnterName SeatNumber
@@ -147,13 +160,20 @@ type Msg
   | Sit Int
 
 
+getHostName: String -> String
+getHostName url =
+    case String.split "/" url of
+        protocol::_::hostname::_ -> protocol ++ "//" ++ hostname
+        _ -> ""
+
+
 jsonStateDecoder: D.Decoder JsonState
 jsonStateDecoder =
-    D.map2 JsonState
+    D.map3 JsonState
         (D.field "seats" (D.dict D.string))
         (D.field "players"
             (D.dict
-                (D.map3 JsonPlayer
+                (D.map4 JsonPlayer
                     (D.field "name" D.string)
                     (D.field "state" D.string)
                     (D.maybe (D.field "cards"
@@ -164,9 +184,11 @@ jsonStateDecoder =
                             )
                         ))
                     )
+                    (D.maybe (D.field "committed_by" D.int))
                 )
             )
         )
+        (D.field "game_state" D.string)
 
 
 gameStateFromJsonState: JsonState -> GameState
@@ -176,9 +198,9 @@ gameStateFromJsonState jsonState =
         stringStateToUiState stringState seatNumber =
             case stringState of
                 "WAITING_NEW_GAME" -> WaitingNextGame seatNumber
-                "MY_TURN" -> Playing seatNumber
-                "IN_GAME" -> Playing seatNumber
-                "FOLDED" -> Playing seatNumber
+                "MY_TURN" -> Playing seatNumber MyTurn
+                "IN_GAME" -> Playing seatNumber InGame
+                "FOLDED" -> Playing seatNumber Folded
                 _ -> Iddle seatNumber
         maybeTwoCardsFromCardsList list =
             case list of
@@ -194,6 +216,7 @@ gameStateFromJsonState jsonState =
                     Just cardList -> maybeTwoCardsFromCardsList cardList
                     Nothing -> Nothing
                 )
+                jsonPlayer.committedBy
         makePlayer playerId seatNumber =
             case Dict.get playerId jsonState.players of
                 Nothing ->
@@ -212,8 +235,10 @@ gameStateFromJsonState jsonState =
             )
     in
     GameState
-        <| Dict.fromList
-            <| List.map stringSeatPlayerIdToSeatNumberPlayer seatsAsTuple
+        (Dict.fromList (List.map stringSeatPlayerIdToSeatNumberPlayer seatsAsTuple))
+        (case jsonState.gameState of
+            
+        )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -226,16 +251,27 @@ update msg model =
                     , Cmd.none
                     )
                 Err error ->
-                    Debug.log ("I am fucking here bitch " ++ Debug.toString error)
+                    Debug.log ("Error when decoding json state: " ++ Debug.toString error)
                     ( model
                     , Cmd.none
                     )
-        Bet ->
+        PrepareRaise ->
             ( model
             , Cmd.none
             )
-        TableName tableName ->
-            ( { model | baseUrl = baseUrl ++ "table/" ++ tableName }
+        Fold ->
+            ( model
+            , Http.post
+                  { url = model.baseUrl ++ "/actions/fold"
+                  , expect = Http.expectWhatever Discard
+                  , body = Http.jsonBody
+                  <| Encode.object
+                      [ ("player_name", Encode.string model.playerName)
+                      ]
+                  }
+            )
+        TableName baseUrl ->
+            ( { model | baseUrl = baseUrl, hostName = getHostName baseUrl }
             , Cmd.none
             )
         Discard _ ->
@@ -243,11 +279,11 @@ update msg model =
             , Cmd.none
             )
         EnterName seatNumber ->
-            ( { model | playerState = Sitting seatNumber }
+            ( { model | seated = PickingName seatNumber }
             , Cmd.none
             )
         Sit seatNumber ->
-            ( { model | playerState = Playing seatNumber }
+            ( { model | seated = Seated seatNumber }
             , Http.post
                   { url = model.baseUrl ++ "/actions/sit"
                   , expect = Http.expectWhatever Discard
@@ -287,6 +323,8 @@ theme =
     , other = rgb 69 73 85
     , tableGreen = rgb 114 176 29
     , buttonBlue = rgb 77 189 219
+    , fontSizeButtons = Css.fontSize <| Css.pct 160
+    , fontWeightButtons = Css.fontWeight Css.bold
     }
 
 
@@ -296,19 +334,26 @@ type alias Position =
     }
 
 
+interactCommonCss: Css.Style
+interactCommonCss =
+    Css.batch
+        [ Css.backgroundColor theme.buttonBlue
+        , Css.width <| Css.pct 10
+        , Css.height <| Css.pct 7
+        , Css.borderRadius <| Css.px 13
+        , Css.position Css.absolute
+        , Css.color theme.cardWhite
+        , Css.fontSize <| Css.pct 160
+        , Css.fontWeight Css.bold
+        ]
+
+
 sitButton: Position -> SeatNumber -> Html Msg
 sitButton position seatNumber =
     button
         [ css
-            [ Css.backgroundColor theme.buttonBlue
-            , Css.width <| Css.pct 10
-            , Css.height <| Css.pct 7
-            , Css.position Css.absolute
-            , Css.borderRadius <| Css.px 13
+            [ interactCommonCss
             , playerPositionCss position
-            , Css.color theme.cardWhite
-            , Css.fontSize <| Css.pct 160
-            , Css.fontWeight Css.bold
             ]
         , onClick <| EnterName seatNumber
         ]
@@ -333,22 +378,16 @@ ifIsEnter msg =
 
 renderEmptySit: Model -> Position -> SeatNumber -> Html Msg
 renderEmptySit model position seatNumber =
-    case model.playerState of
-        Iddle _ ->
+    case model.seated of
+        Not ->
             sitButton position seatNumber
-        Sitting onSeat ->
+        PickingName onSeat ->
             if onSeat == seatNumber then
                 input
                     [ placeholder "Enter your name"
                     , css
-                          [ Css.backgroundColor theme.buttonBlue
-                          , Css.width <| Css.pct 10
-                          , Css.height <| Css.pct 7
-                          , Css.borderRadius <| Css.px 13
+                          [ interactCommonCss
                           , playerPositionCss position
-                          , Css.color theme.cardWhite
-                          , Css.fontSize <| Css.pct 160
-                          , Css.fontWeight Css.bold
                           ]
                     , on "keydown" (ifIsEnter <| Sit seatNumber)
                     , onInput NameUpdate
@@ -356,9 +395,7 @@ renderEmptySit model position seatNumber =
                     []
             else
                 sitButton position seatNumber
-        Playing _ ->
-            div [ css [ playerPositionCss position ] ] [ text "Empty seat" ]
-        WaitingNextGame _ ->
+        Seated _ ->
             div [ css [ playerPositionCss position ] ] [ text "Empty seat" ]
 
 
@@ -387,8 +424,8 @@ cardToFilename card =
     valueCode ++ suitCode
 
 
-renderPlayer: Player -> Position -> SeatNumber -> Html Msg
-renderPlayer player position mySeatNumber =
+renderPlayer: Model -> Player -> Position -> SeatNumber -> Html Msg
+renderPlayer model player position mySeatNumber =
     let
         cardProportion = 0.32
         cardHeight = 12
@@ -402,7 +439,7 @@ renderPlayer player position mySeatNumber =
             [ Css.width (Css.vw <| cardProportion*cardHeight)
             , Css.height (Css.vh <| cardHeight)
             ]
-        cardToUrl = \card -> baseUrl ++ "static/cards/" ++ cardToFilename card ++ ".svg"
+        cardToUrl = \card -> model.hostName ++ "/static/cards/" ++ cardToFilename card ++ ".svg"
         renderCard cardLeftPos url =
             div
                 [ css
@@ -430,9 +467,9 @@ renderPlayer player position mySeatNumber =
                     ]
                 Nothing ->
                     case player.state of
-                        Playing _ ->
-                            [ renderCard cardLeft1 <| baseUrl ++ "static/cards/1B.svg"
-                            , renderCard cardLeft2 <| baseUrl ++ "static/cards/1B.svg"
+                        Playing _ _ ->
+                            [ renderCard cardLeft1 <| model.hostName ++ "/static/cards/1B.svg"
+                            , renderCard cardLeft2 <| model.hostName ++ "/static/cards/1B.svg"
                             ]
                         _ ->
                             []
@@ -446,16 +483,20 @@ renderPlayer player position mySeatNumber =
                 , Css.position Css.relative
                 , Css.top (Css.vh -10)
                 , Css.left (Css.vw -5)
+                , theme.fontSizeButtons
+                , theme.fontWeightButtons
+                , Css.color theme.cardWhite
                 ]
             ]
             [ img
-                 [ src <| baseUrl ++ "static/avatar" ++ String.fromInt mySeatNumber ++ ".png"
+                 [ src <| model.hostName ++ "/static/avatar" ++ String.fromInt mySeatNumber ++ ".png"
                  , css
                      [ Css.height (Css.pct 100)
                      , Css.width (Css.pct 100)
                      ]
                  ]
                  []
+            , text <| Maybe.withDefault "" (Maybe.map String.fromInt player.committedBy)
             ]
         ] ++ renderCards player.cards)
 
@@ -468,27 +509,90 @@ playerSit model position seatNumber =
         Just Nothing ->
             renderEmptySit model position seatNumber
         Just (Just player) ->
-            renderPlayer player position seatNumber
+            renderPlayer model player position seatNumber
 
 
 playerSits: Model -> List (Html Msg)
 playerSits model =
-    [ playerSit model { pctTop = 17, pctLeft = 45} 2
-    , playerSit model { pctTop = 31, pctLeft = 10} 1
-    , playerSit model { pctTop = 31, pctLeft = 80} 3
-    , playerSit model { pctTop = 63, pctLeft = 10} 6
-    , playerSit model { pctTop = 63, pctLeft = 80} 4
-    , playerSit model { pctTop = 75, pctLeft = 45} 5
+    let
+        offset: Position
+        offset = { pctTop = -5, pctLeft = 0}
+    in
+    [ playerSit model { pctTop = 17 + offset.pctTop , pctLeft = 45 + offset.pctLeft } 2
+    , playerSit model { pctTop = 31 + offset.pctTop , pctLeft = 10 + offset.pctLeft} 1
+    , playerSit model { pctTop = 31 + offset.pctTop , pctLeft = 80 + offset.pctLeft} 3
+    , playerSit model { pctTop = 63 + offset.pctTop , pctLeft = 10 + offset.pctLeft} 6
+    , playerSit model { pctTop = 63 + offset.pctTop , pctLeft = 80 + offset.pctLeft} 4
+    , playerSit model { pctTop = 75 + offset.pctTop , pctLeft = 45 + offset.pctLeft} 5
     ]
 
 
-actions: Model -> List (Html Msg)
-actions model =
-    case model.playerState of
-        Iddle _ -> []
-        Sitting _ -> []
-        Playing seatNumber -> []
-        WaitingNextGame seatNumber -> []
+inGameActions: Model -> List (Html Msg)
+inGameActions model =
+    let
+        position: Position
+        position = { pctTop = 92, pctLeft = 69}
+        shouldDisplayActions: Bool
+        shouldDisplayActions =
+            case model.seated of
+                    Seated seatNumber ->
+                        case Dict.get seatNumber model.gameState.seats of
+                            Just (Just me) ->
+                                case me.state of
+                                    Playing _ MyTurn ->
+                                        True
+                                    _ ->
+                                        False
+                            _ ->
+                                False
+                    _ ->
+                        False
+        offsetLeft: Float -> Css.Style
+        offsetLeft pctOffset =
+            Css.batch
+                [ Css.top (Css.pct position.pctTop)
+                , Css.left (Css.pct <| pctOffset + position.pctLeft)
+                , Css.position Css.absolute
+                ]
+    in
+    if shouldDisplayActions then
+        [ button
+            [ css
+                [ interactCommonCss
+                , offsetLeft 0
+                ]
+            , onClick <| PrepareRaise
+            ]
+            [ text "RAISE"]
+        , button
+            [ css
+                [ interactCommonCss
+                , offsetLeft 10.1
+                ]
+            , onClick <| Fold
+            ]
+            [ text "FOLD"]
+        , button
+            [ css
+                [ interactCommonCss
+                , offsetLeft 20.2
+                ]
+            , onClick <| PrepareRaise
+            ]
+            [ text "CHECK"]
+        ]
+    else
+        []
+
+gameOverActions: Model -> List (Html Msg)
+gameOverActions model =
+    let
+        position: Position
+        position = { pctTop = 92, pctLeft = 69}
+        shouldDisplayActions: Bool
+        shouldDisplayActions = True
+    in
+    []
 
 
 view : Model -> Html Msg
@@ -501,13 +605,14 @@ view model =
             , Css.height <| Css.pct 100
             ]
       ]
-      (playerSits model ++
-
+      (playerSits model
+      ++ inGameActions model
+      ++
       [ div
             [ css
                 [ Css.zIndex <| Css.int 2
                 , Css.width <| Css.pct 100
-                , Css.height <| Css.pct 100
+                , Css.height <| Css.pct 99.5
                 ]
             ]
             [ Svg.svg
@@ -516,7 +621,7 @@ view model =
                 , Svg.Styled.Attributes.height "100%"
                 ]
                 [ Svg.ellipse
-                    [ cx "50%", cy "50%", rx "41%", ry "30%" ]
+                    [ cx "50%", cy "45%", rx "41%", ry "30%" ]
                     []
                 ]
             ]

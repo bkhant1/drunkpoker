@@ -7,6 +7,13 @@ import os
 import json
 
 
+def get_host(headers):
+    for key, value in headers:
+        if key == b'host':
+            return value.decode("utf-8")
+    return ''
+
+
 class WelcomePage(AsyncHttpConsumer):
 
     async def handle(self, body):
@@ -55,7 +62,8 @@ class JoinTable(AsyncHttpConsumer):
 class PlayerActions(AsyncHttpConsumer):
 
     EVENT_TYPE_FROM_URL_ACTION = {
-        "sit": engine.Event.PLAYER_SIT
+        "sit": engine.Event.PLAYER_SIT,
+        "fold": engine.Event.FOLD
     }
 
     def event_type(self):
@@ -148,9 +156,7 @@ class StreamGameState(AsyncWebsocketConsumer):
                 self.table_group_name,
                 {
                     'type': 'game_state_updated',
-                    'message': json.dumps(
-                        engine.strip_state_for_player(new_state, player_id)
-                    )
+                    'message': json.dumps(new_state)
                 }
             )
         except engine.EventRejected as e:
@@ -158,7 +164,7 @@ class StreamGameState(AsyncWebsocketConsumer):
 
     async def game_state_updated(self, text_data):
         player_id = self.scope["cookies"]["sessionid"]
-        #print(f'Streaming state to {player_id}')
+        print(f'Streaming state to {player_id}')
 
         state = json.loads(text_data["message"])
         new_state = engine.strip_state_for_player(state, player_id)
