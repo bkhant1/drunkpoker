@@ -63,7 +63,8 @@ class PlayerActions(AsyncHttpConsumer):
 
     EVENT_TYPE_FROM_URL_ACTION = {
         "sit": engine.Event.PLAYER_SIT,
-        "fold": engine.Event.FOLD
+        "fold": engine.Event.FOLD,
+        "nextGame": engine.Event.PLAYER_READY_FOR_NEXT_GAME
     }
 
     def event_type(self):

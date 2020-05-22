@@ -14,9 +14,7 @@ import Svg.Styled as Svg
 import Svg.Styled.Attributes exposing (cx, cy, fill, rx, ry)
 
 
---baseUrl: String
---baseUrl = "https://obscure-shore-25002.herokuapp.com/"
---baseUrl= "http://localhost:1234/"
+-- elm-live --start-page=index.html src/Main.elm -- --output=elm.js --debug
 
 
 -- MAIN
@@ -86,7 +84,7 @@ type alias Player =
 
 
 type EnumGameState =
-    Progressing
+    GameInProgress
     | GameOver
 
 
@@ -118,16 +116,37 @@ getSeatNumber seated =
         _ -> Nothing
 
 
+getMePlayer: Model -> Maybe Player
+getMePlayer model =
+    let
+        seatNumber = getSeatNumber model.seated
+    in
+    case seatNumber of
+        Nothing ->
+            Nothing
+        Just theSeatNumber ->
+            case Dict.get theSeatNumber model.gameState.seats of
+                Just player ->
+                    player
+                _ ->
+                    Nothing
+
+
 makeEmptySeat: SeatNumber -> (SeatNumber, Maybe Player)
 makeEmptySeat seatNumber =
     (seatNumber, Nothing)
 
 
+initGameOver =
+    ( { baseUrl = "http://localhost:1234/table/123", gameState = { gameState = GameOver, seats = Dict.fromList [(1,Just { cards = Just ({ suit = "DIAMONDS", value = 11 },{ suit = "HEART", value = 4 }), committedBy = Just 1, name = "Hey", state = Playing 1 Folded }),(2,Just { cards = Nothing, committedBy = Just 2, name = "Ho !", state = Playing 2 InGame }),(3,Nothing),(4,Nothing),(5,Nothing),(6,Nothing),(7,Nothing),(8,Nothing),(9,Nothing),(10,Nothing)] }, hostName = "http://localhost:1234", playerName = "Hey", seated = Seated 1 }
+    , Cmd.none
+    )
+
 realInit =
     ( { gameState =
         { seats =
             Dict.fromList <| List.map makeEmptySeat <| List.range 1 6
-        , gameState = Progressing
+        , gameState = GameInProgress
         }
       , playerName = ""
       , baseUrl = ""
@@ -139,11 +158,7 @@ realInit =
 
 
 init : () -> ( Model, Cmd Msg )
-init flags = realInit
-  --( initWithObama
-  --, Cmd.none
-  --)
-
+init flags = realInit--initGameOver
 
 
 -- UPDATE
@@ -153,6 +168,9 @@ type Msg
   = Recv String
   | PrepareRaise
   | Fold
+  | Check
+  | ShowCards
+  | NextGame
   | TableName String
   | Discard (Result Http.Error ())
   | EnterName SeatNumber
@@ -237,12 +255,13 @@ gameStateFromJsonState jsonState =
     GameState
         (Dict.fromList (List.map stringSeatPlayerIdToSeatNumberPlayer seatsAsTuple))
         (case jsonState.gameState of
-            
+            "GAME_OVER" -> GameOver
+            _ -> GameInProgress
         )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg model = Debug.log "The state: " <|
     case msg of
         Recv message ->
             case D.decodeString jsonStateDecoder message of
@@ -298,6 +317,32 @@ update msg model =
             ( { model | playerName = name }
             , Cmd.none
             )
+        ShowCards ->
+            ( model
+            , Cmd.none
+            )
+        NextGame ->
+            ( model
+            , Http.post
+                  { url = model.baseUrl ++ "/actions/nextGame"
+                  , expect = Http.expectWhatever Discard
+                  , body = Http.jsonBody
+                  <| Encode.object
+                      [ ("player_name", Encode.string model.playerName)
+                      ]
+                  }
+            )
+        Check ->
+            ( model
+            , Http.post
+                  { url = model.baseUrl ++ "/actions/check"
+                  , expect = Http.expectWhatever Discard
+                  , body = Http.jsonBody
+                  <| Encode.object
+                      [ ("player_name", Encode.string model.playerName)
+                      ]
+                  }
+            )
 
 
 -- SUBSCRIPTIONS
@@ -323,6 +368,7 @@ theme =
     , other = rgb 69 73 85
     , tableGreen = rgb 114 176 29
     , buttonBlue = rgb 77 189 219
+    , buttonGrey = rgb 140 140 140
     , fontSizeButtons = Css.fontSize <| Css.pct 160
     , fontWeightButtons = Css.fontWeight Css.bold
     }
@@ -577,7 +623,7 @@ inGameActions model =
                 [ interactCommonCss
                 , offsetLeft 20.2
                 ]
-            , onClick <| PrepareRaise
+            , onClick <| Check
             ]
             [ text "CHECK"]
         ]
@@ -587,12 +633,58 @@ inGameActions model =
 gameOverActions: Model -> List (Html Msg)
 gameOverActions model =
     let
+        isCurrentPlayerWaitingForNewGame =
+            case getMePlayer model of
+                Just player ->
+                    case player.state of
+                        WaitingNextGame _ ->
+                            False
+                        _ ->
+                            True
+                Nothing ->
+                    False
         position: Position
         position = { pctTop = 92, pctLeft = 69}
         shouldDisplayActions: Bool
-        shouldDisplayActions = True
+        shouldDisplayActions =
+            case model.gameState.gameState of
+                GameInProgress -> False
+                GameOver -> True
+        offsetLeft pctOffset =
+            Css.batch
+                [ Css.top (Css.pct position.pctTop)
+                , Css.left (Css.pct <| pctOffset + position.pctLeft)
+                , Css.position Css.absolute
+                ]
+        buttonNextGame =
+            button
+                [ css
+                    [ interactCommonCss
+                    , offsetLeft 0
+                    ]
+                , onClick <| NextGame
+                ]
+                [ text "NEXT GAME"]
+        buttonShowCards =
+            button
+                [ css
+                    [ interactCommonCss
+                    , offsetLeft 10.1
+                    , Css.backgroundColor theme.buttonGrey
+                    ]
+                , onClick <| ShowCards
+                , disabled True
+                ]
+                [ text "SHOW CARDS"]
+
     in
-    []
+    if shouldDisplayActions then
+        if isCurrentPlayerWaitingForNewGame then
+            [ buttonNextGame, buttonShowCards ]
+        else
+            [ buttonShowCards ]
+    else
+        []
 
 
 view : Model -> Html Msg
@@ -607,6 +699,7 @@ view model =
       ]
       (playerSits model
       ++ inGameActions model
+      ++ gameOverActions model
       ++
       [ div
             [ css
