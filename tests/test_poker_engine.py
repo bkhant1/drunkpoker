@@ -21,9 +21,26 @@ def shuffled_test_deck():
 
 
 @pytest.fixture
+def add_player(base_table):
+
+    def do_it(player_id, seat_number="1", state=engine.PlayerState.IN_GAME, committed_by=None):
+        base_table["seats"][str(seat_number)] = player_id
+        base_table["players"][player_id] = {
+            **{
+                "state": state
+            },
+            **({
+                "committed_by": committed_by
+            } if committed_by else {})
+        }
+
+    return do_it
+
+
+@pytest.fixture
 def empty_table():
     return {
-        'deck': engine.deck,
+        'deck': list(engine.deck),
         'flop': [],
         'seats': {
             "1": "",
@@ -46,9 +63,19 @@ def empty_table():
 
 
 @pytest.fixture
+def base_table(empty_table):
+    return empty_table
+
+
+@pytest.fixture
+def game_state_preflop(base_table):
+    base_table["game_state"] = engine.GameState.PREFLOP
+
+
+@pytest.fixture
 def table_with_one_player():
     return {
-        'deck': engine.deck,
+        'deck': list(engine.deck),
         'flop': [],
         'seats': {
             "1": "",
@@ -155,7 +182,7 @@ def iddle_game_with_4_players_and_a_dealer():
 def ongoing_game_with_two_players():
     return {
         'deck': engine.deck,
-        'flop': [],
+        'flop': ["C1", "C2", "C3"],
         'seats': {  # Note dictionaries are unordered
             "1": "",
             "4": "other_id",
@@ -722,6 +749,25 @@ def ongoing_game_with_three_players_one_waiting(ongoing_game_with_three_players_
     return ongoing_game_with_three_players_one_folded
 
 
+@pytest.fixture
+def game_with_two_players_aligned_p1_to_check_or_raise():
+    return {
+        "flop": [],
+        "seats": {"1": "P1",
+                  "2": "P2",
+                  "3": ""},
+        "turn_to": -1,
+        "players": {"P1":
+                        {"name": "Hey", "state": "MY_TURN", "committed_by": 2},
+                    "P2":
+                        {"name": "Ho !", "state": "IN_GAME", "committed_by": 2,
+                         "cards": [[10, "DIAMONDS"], [10, "SPADE"]]}},
+        "game_state": "PREFLOP",
+        "dealing": "1",
+        "small_blind": 2,
+        "big_blind": 2}
+
+
 def test_mock_shuffle_deck():
     with mock.patch('drunkpoker.main.engine.shuffle_deck') as mock_shuffle:
         mock_shuffle.return_value = "I have been mocked"
@@ -798,9 +844,9 @@ class TestSit:
 
 class TestProcessEvent:
 
-    def test_sit_on_table_with_one_player(self, table_with_one_player, shuffled_test_deck):
-        with mock.patch('drunkpoker.main.engine.shuffle_deck') as mock_shuffle:
-            mock_shuffle.return_value = list(shuffled_test_deck)
+    def test_sit_on_table_with_one_player_starts_game(self, table_with_one_player, shuffled_test_deck):
+        with mock.patch('drunkpoker.main.engine.start_game') as mock_start_game:
+            mock_start_game.return_value = None, "Dummy_state"
             new_state = engine.process_event(
                 table_with_one_player,
                 {
@@ -812,33 +858,15 @@ class TestProcessEvent:
                     }
                 }
             )
-            assert new_state["deck"] == list(shuffled_test_deck[4:])
-            assert new_state["game_state"] == engine.GameState.PREFLOP
-            assert new_state["seats"]["5"] == "wxyz6789"
-            assert new_state["dealing"] == "3"
-            assert "wxyz6789" in new_state["players"]
-            assert new_state["players"]["abcd1234"] == {
-                "state": engine.PlayerState.IN_GAME,
-                "name": "Quentin",
-                "committed_by": new_state["big_blind"],
-                "cards": list(shuffled_test_deck[0:2])
-            }
-            assert new_state["players"]["wxyz6789"] == {
-                "state": engine.PlayerState.MY_TURN,
-                "name": "Paul",
-                "committed_by": new_state["small_blind"],
-                "cards": list(shuffled_test_deck[2:4])  # Not a conventional way of dealing but w/e
-            }
-            assert new_state["dealing"] == "3"
-            assert new_state["flop"] == []
+            assert new_state == "Dummy_state"
 
     def test_exclude_player_makes_game_restart(
             self,
             ongoing_game_with_three_players_one_waiting,
             shuffled_test_deck
     ):
-        with mock.patch('drunkpoker.main.engine.shuffle_deck') as mock_shuffle:
-            mock_shuffle.return_value = list(shuffled_test_deck)
+        with mock.patch('drunkpoker.main.engine.start_game') as mock_start_game:
+            mock_start_game.return_value = None, "Dummy_state"
             new_state = engine.process_event(
                 ongoing_game_with_three_players_one_waiting,
                 {
@@ -846,21 +874,7 @@ class TestProcessEvent:
                     "player_id": "abcd1234"
                 }
             )
-        assert not new_state["seats"]["3"]
-        assert new_state["dealing"] == "4"
-        assert "abcd1234" not in new_state["players"]
-        assert new_state["players"]["other_id"] == {
-            "state": engine.PlayerState.IN_GAME,
-            "name": "Jean",
-            "committed_by": new_state["big_blind"],
-            "cards": list(shuffled_test_deck[0:2])
-        }
-        assert new_state["players"]["other_other_id"] == {
-            "state": engine.PlayerState.MY_TURN,
-            "name": "Louis",
-            "committed_by": new_state["small_blind"],
-            "cards": list(shuffled_test_deck[2:4])
-        }
+            assert new_state == "Dummy_state"
 
 
 class TestDetermineNextDealer:
@@ -992,6 +1006,7 @@ class TestExcludePlayer:
     def test_exclude_player_game_started_with_two_players(self, ongoing_game_with_two_players):
         event, new_state = engine.exclude_player(ongoing_game_with_two_players, "abcd1234")
         assert event is None
+        assert not new_state["flop"]
         assert new_state["dealing"] == ""
         assert not "abcd1234" in new_state["players"]
         assert new_state["players"]["other_id"] == {
@@ -1010,6 +1025,21 @@ class TestExcludePlayer:
         assert "abcd1234" not in new_state["players"]
         assert new_state["dealing"] == "3"  # Don't change the dealer
         assert new_state["players"]["other_id"]["state"] == engine.PlayerState.MY_TURN  # player after abcd1234
+
+    def test_exclude_player_game_should_be_over(
+            self,
+            ongoing_game_with_three_players_one_folded):
+        event, new_state = engine.exclude_player(ongoing_game_with_three_players_one_folded, "abcd1234")
+        assert event is None
+        assert new_state["seats"]["3"] == ""
+        assert "abcd1234" not in new_state["players"]
+        assert new_state["game_state"] == engine.GameState.GAME_OVER
+        assert new_state["results"] == {
+            "winner": "other_other_id",
+            "drinkers": {
+                "other_id": 2
+            }
+        }
 
     def test_exclude_waiting_for_new_game_player(self, ongoing_game_with_three_players_one_waiting):
         next_event, new_state = engine.exclude_player(
@@ -1084,15 +1114,15 @@ class TestStartGame:
             assert new_state["dealing"] == "3"
             assert "wxyz6789" in new_state["players"]
             assert new_state["players"]["abcd1234"] == {
-                "state": engine.PlayerState.IN_GAME,
-                "name": "Quentin",
-                "committed_by": new_state["big_blind"],
-                "cards": list(shuffled_test_deck[0:2])
-            }
-            assert new_state["players"]["wxyz6789"] == {
                 "state": engine.PlayerState.MY_TURN,
                 "name": "Quentin",
                 "committed_by": new_state["small_blind"],
+                "cards": list(shuffled_test_deck[0:2])
+            }
+            assert new_state["players"]["wxyz6789"] == {
+                "state": engine.PlayerState.IN_GAME,
+                "name": "Quentin",
+                "committed_by": new_state["big_blind"],
                 "cards": list(shuffled_test_deck[2:4])  # Not a conventional way of dealing but w/e
             }
             assert new_state["dealing"] == "3"
@@ -1109,12 +1139,12 @@ class TestStartGame:
         ]) == 3
         assert new_state["dealing"] == "4"
 
-        big_blind_player_id = new_state["seats"]["4"]  # Dealer
-        small_blind_player_id = new_state["seats"]["3"]
+        big_blind_player_id = new_state["seats"]["3"]  # Dealer
+        small_blind_player_id = new_state["seats"]["1"]
         assert new_state["players"][big_blind_player_id]["committed_by"] == new_state["big_blind"]
         assert new_state["players"][small_blind_player_id]["committed_by"] == new_state["small_blind"]
 
-        assert new_state["players"]["p4"]["state"] == engine.PlayerState.MY_TURN
+        assert new_state["players"]["p3"]["state"] == engine.PlayerState.MY_TURN
 
         assert len(new_state["deck"]) == 52 - 8
         for player in new_state["players"].values():
@@ -1132,8 +1162,8 @@ class TestStartGame:
         assert new_state["game_state"] == engine.GameState.PREFLOP
         assert new_state["dealing"] == "4"
         # No longer comitted
-        assert "committed_by" not in new_state["players"]["other_other_id"]\
-               or int(new_state["players"]["other_other_id"]["committed_by"]) == 0
+        assert "committed_by" not in new_state["players"]["other_id"]\
+               or int(new_state["players"]["other_id"]["committed_by"]) == 0
 
 
 class TestStripStateForPlayer:
@@ -1189,18 +1219,6 @@ class TestStripStateForPlayer:
 
 
 class TestFold:
-
-    def test_fold_2_players_not_her_turn(self, ongoing_game_with_two_players):
-        old_state = copy.deepcopy(ongoing_game_with_two_players)
-        with pytest.raises(engine.EventRejected):
-            engine.fold_player(ongoing_game_with_two_players, "other_id")
-        assert ongoing_game_with_two_players == old_state
-
-    def test_fold_unknown_player(self, ongoing_game_with_three_players_one_folded):
-        old_state = copy.deepcopy(ongoing_game_with_three_players_one_folded)
-        with pytest.raises(engine.EventRejected):
-            engine.fold_player(ongoing_game_with_three_players_one_folded, "other_id")
-        assert ongoing_game_with_three_players_one_folded == old_state
 
     def test_fold_2_players_her_turn(self, ongoing_game_with_two_players):
         event, new_state = engine.fold_player(ongoing_game_with_two_players, "abcd1234")
@@ -1386,26 +1404,39 @@ class TestNextGame:
         assert event == {"type": engine.Event.START_GAME}
 
 
-class TestCheck:
+@pytest.mark.parametrize("action", [engine.player_call, engine.player_check, engine.fold_player])
+class TestCheckOrCallOrFold:
 
     @pytest.mark.parametrize("game_state", [
         (engine.GameState.GAME_OVER,),
         (engine.GameState.NOT_STARTED,)
     ])
-    def test_check_game_not_ongoing(self, game_state):
+    def test_check_game_not_ongoing(self, action, game_state):
         state = {"game_state": game_state}
         with pytest.raises(engine.EventRejected):
-            _ = engine.player_check(state, "played_id")
+            _ = action(state, "played_id")
+
+    @pytest.mark.parametrize("game_state", [
+        (engine.GameState.GAME_OVER,),
+        (engine.GameState.NOT_STARTED,)
+    ])
+    def test_check_game_not_ongoing(self, action, game_state):
+        state = {"game_state": game_state}
+        with pytest.raises(engine.EventRejected):
+            _ = action(state, "player_id")
 
     @pytest.mark.parametrize("player_state", [
         (engine.PlayerState.WAITING_NEW_GAME,),
         (engine.PlayerState.FOLDED,),
         (engine.PlayerState.IN_GAME,)
     ])
-    def test_check_not_her_turn(self, player_state):
+    def test_check_not_her_turn(self, action, player_state):
         state = {"game_state": engine.GameState.FLOP, "players": {"p1": {"state": player_state}}}
         with pytest.raises(engine.EventRejected):
-            _ = engine.player_check(state, "p1")
+            _ = action(state, "p1")
+
+
+class TestCheck:
 
     def test_big_blind_player_check(self, ongoing_game_all_called_turn_to_big_blind_to_check_or_raise):
         event, state = engine.player_check(
@@ -1467,5 +1498,222 @@ class TestCheck:
         assert state["players"]["P4"]["state"] == engine.PlayerState.WAITING_NEW_GAME
         assert state["players"]["P5"]["state"] == engine.PlayerState.FOLDED
 
+    def test_check_two_players_in_the_game_aligned(self, game_with_two_players_aligned_p1_to_check_or_raise):
+        event, state = engine.player_check(
+            game_with_two_players_aligned_p1_to_check_or_raise,
+            "P1"
+        )
+        assert event is None
+        assert state["game_state"] == engine.GameState.PREFLOP
+        assert state["players"]["P1"]["state"] == engine.PlayerState.IN_GAME
+        assert state["players"]["P2"]["state"] == engine.PlayerState.MY_TURN
 
 
+class TestCall:
+
+    def test_call_when_max_better_resiliency(self, base_table, add_player, game_state_preflop):
+        add_player("P1", seat_number=1, committed_by=3)
+        add_player("P2", seat_number=2, committed_by=10, state=engine.PlayerState.MY_TURN)
+
+        event, new_state = engine.player_call(
+            base_table,
+            "P2"
+        )
+
+        assert event is None
+        assert new_state["players"]["P1"]["committed_by"] == 3
+        assert new_state["players"]["P2"]["committed_by"] == 10
+        # It's an illegal state, but best effort to make it legal (hand to unaligned player)
+        assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
+        assert new_state["players"]["P2"]["state"] == engine.PlayerState.IN_GAME
+
+    def test_call_aligns_with_max_bet(self, base_table, add_player, game_state_preflop):
+        add_player("P1", seat_number=1, committed_by=3)
+        add_player("P2", seat_number=2, committed_by=1, state=engine.PlayerState.MY_TURN)
+
+        event, new_state = engine.player_call(
+            base_table,
+            "P2"
+        )
+
+        assert new_state["players"]["P2"]["committed_by"] == 3
+        assert new_state["players"]["P1"]["committed_by"] == 3
+
+    def test_call_when_should_check_checks(self, base_table, add_player, game_state_preflop):
+        add_player("P1", seat_number=1, committed_by=3)
+        add_player("P2", seat_number=2, committed_by=3, state=engine.PlayerState.MY_TURN)
+        add_player("P3", seat_number=3, committed_by=3)
+        base_table["dealing"] = "1"
+
+        event, new_state = engine.player_call(
+            base_table,
+            "P2"
+        )
+
+        assert event is None
+        assert new_state["players"]["P2"]["committed_by"] == 3
+        assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
+        assert new_state["players"]["P2"]["state"] == engine.PlayerState.IN_GAME
+
+    def test_call_turn_to_big_blind_go_to_next_round(self, base_table, add_player, game_state_preflop):
+        add_player("P1", seat_number=1, committed_by=3)
+        add_player("P2", seat_number=2, state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P3", seat_number=3, committed_by=3)
+        add_player("P5", seat_number=5, state=engine.PlayerState.FOLDED)
+        add_player("P8", seat_number=8, committed_by=2, state=engine.PlayerState.MY_TURN)
+        base_table["dealing"] = "1"  # Means big blind is P8 (player before dealer)
+        base_table["game_state"] = engine.GameState.PREFLOP
+
+        event, new_state = engine.player_call(
+            base_table,
+            "P8"
+        )
+
+        assert event == engine.Event.make_event(engine.Event.DRAW_FLOP)
+        assert new_state["players"]["P8"]["committed_by"] == 3
+        for player in ["P1", "P3", "P8"]:
+            assert new_state["players"][player]["state"] == engine.PlayerState.IN_GAME
+
+    @pytest.mark.parametrize(
+        "turn_to, next_to_play",
+        [("P1", "P3"), ("P3", "P7"), ("P7", "P8")]
+    )
+    def test_call_passes_hand_to_correct_player(
+            self,
+            turn_to,
+            next_to_play,
+            base_table,
+            add_player,
+            game_state_preflop):
+
+        def make_state(player_id):
+            return engine.PlayerState.MY_TURN if player_id == turn_to else engine.PlayerState.IN_GAME
+
+        add_player("P1", seat_number=1, committed_by=1, state=make_state("P1"))
+        add_player("P2", seat_number=2, state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P3", seat_number=3, committed_by=2, state=make_state("P3"))
+        add_player("P5", seat_number=5, state=engine.PlayerState.FOLDED)
+        add_player("P7", seat_number=7, committed_by=3, state=make_state("P7"))
+        add_player("P8", seat_number=8, committed_by=10, state=make_state("P8"))
+
+        event, new_state = engine.player_call(
+            base_table,
+            turn_to
+        )
+
+        assert new_state["players"][next_to_play]["state"] == engine.PlayerState.MY_TURN
+
+
+@pytest.mark.parametrize("action", [engine.draw_flop, engine.draw_river, engine.draw_turn])
+class TestDrawFlop:
+
+    def test_draw_flop_no_deck(self):
+        the_state = {}
+        with pytest.raises(engine.EventRejected):
+            _ = engine.draw_flop(the_state)
+        the_state["deck"] = None
+        with pytest.raises(engine.EventRejected):
+            _ = engine.draw_flop(the_state)
+        the_state["deck"] = ["Card1", "Card2"]
+        with pytest.raises(engine.EventRejected):
+            _ = engine.draw_flop(the_state)
+
+    def test_draw_flop_no_next_player(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.FOLDED)
+        with pytest.raises(engine.EventRejected):
+            _ = engine.draw_flop(base_table)
+
+    def test_draw_flop_overrides_state(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
+        base_table["game_state"] = engine.GameState.GAME_OVER
+        event, new_state = engine.draw_flop(base_table)
+
+        assert event is None
+        assert new_state["game_state"] == engine.GameState.FLOP
+
+    def test_draw_flop_no_dealer_set(self, base_table, add_player):
+        """
+        If that's the case assume P1 is the dealer
+        """
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
+        event, new_state = engine.draw_flop(base_table)
+        base_table["dealing"] == ''
+
+        assert event is None
+        assert base_table["dealing"] == "1"
+        assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
+        assert new_state["players"]["P2"]["state"] == engine.PlayerState.IN_GAME
+        assert new_state["game_state"] == engine.GameState.FLOP
+
+    def test_draw_flop_determines_next_player(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
+        add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
+        base_table["game_state"] = engine.GameState.PREFLOP
+        flop = base_table["deck"][0:3]
+        base_table["dealing"] = "1"
+        event, new_state = engine.draw_flop(base_table)
+
+        assert event is None
+        assert new_state["dealing"] == "1"
+        assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
+        for player_id in ["P2", "P3"]:
+            assert new_state["players"][player_id]["state"] == engine.PlayerState.IN_GAME
+        assert new_state["flop"] == flop
+        assert new_state["game_state"] == engine.GameState.FLOP
+
+    def test_draw_flop_dealer_folded(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.FOLDED)
+        add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
+        add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
+        base_table["game_state"] = engine.GameState.PREFLOP
+        base_table["dealing"] = "1"
+        event, new_state = engine.draw_flop(base_table)
+
+        assert event is None
+        assert new_state["players"]["P2"]["state"] == engine.PlayerState.MY_TURN
+
+    def test_draw_flop_no_dealer(self, base_table, add_player):
+        add_player("P2", seat_number=2, state=engine.PlayerState.FOLDED)
+        add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
+        add_player("P4", seat_number=4, state=engine.PlayerState.IN_GAME)
+        base_table["game_state"] = engine.GameState.PREFLOP
+        base_table["dealing"] = "1"
+        event, new_state = engine.draw_flop(base_table)
+
+        assert event is None
+        assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
+
+    def test_draw_flop_two_players(self, base_table, add_player):
+        add_player("P2", seat_number=2, state=engine.PlayerState.FOLDED)
+        add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
+        base_table["game_state"] = engine.GameState.PREFLOP
+        base_table["dealing"] = "3"
+        event, new_state = engine.draw_flop(base_table)
+
+        assert event is None
+        assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
+
+    @pytest.mark.parametrize(
+        "dealer, expected_new_player",
+        [("1", "P1"), ("2", "P6"), ("3", "P6"), ("4", "P6"),
+         ("5", "P6"), ("6", "P6"), ("7", "P1"), ("8", "P1")]
+    )
+    def test_draw_flop_big_table_with_holes(self, dealer, expected_new_player, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
+        add_player("P5", seat_number=5, state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P6", seat_number=6, state=engine.PlayerState.MY_TURN)
+        add_player("P8", seat_number=8, state=engine.PlayerState.FOLDED)
+        base_table["game_state"] = engine.GameState.PREFLOP
+        base_table["dealing"] = dealer
+        event, new_state = engine.draw_flop(base_table)
+
+        assert event is None
+        assert new_state["players"][expected_new_player]["state"] == engine.PlayerState.MY_TURN
+        assert new_state["players"]["P4"]["state"] == engine.PlayerState.FOLDED
+        assert new_state["players"]["P5"]["state"] == engine.PlayerState.WAITING_NEW_GAME
+        assert new_state["players"]["P8"]["state"] == engine.PlayerState.FOLDED
+        assert new_state["game_state"] == engine.GameState.FLOP

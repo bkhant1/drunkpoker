@@ -64,7 +64,9 @@ class PlayerActions(AsyncHttpConsumer):
     EVENT_TYPE_FROM_URL_ACTION = {
         "sit": engine.Event.PLAYER_SIT,
         "fold": engine.Event.FOLD,
-        "nextGame": engine.Event.PLAYER_READY_FOR_NEXT_GAME
+        "nextGame": engine.Event.PLAYER_READY_FOR_NEXT_GAME,
+        "check": engine.Event.CHECK,
+        "call": engine.Event.CALL
     }
 
     def event_type(self):
@@ -128,6 +130,7 @@ class StreamGameState(AsyncWebsocketConsumer):
             self.table_group_name,
             self.channel_name
         )
+
         await self.accept()
         await self.send(text_data=json.dumps(
             engine.strip_state_for_player(

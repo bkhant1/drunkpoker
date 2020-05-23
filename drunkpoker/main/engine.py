@@ -17,6 +17,13 @@ class PlayerState:
     FOLDED = "FOLDED"
 
     @classmethod
+    def could_play(cls, state):
+        return (
+                state == cls.MY_TURN
+                or state == cls.IN_GAME
+        )
+
+    @classmethod
     def is_in_game(cls, state):
         return (
                 state == cls.MY_TURN
@@ -92,7 +99,7 @@ def initial_state():
         'players': {},
         'game_state': GameState.NOT_STARTED,
         'dealing': '',
-        'small_blind': 1,
+        'small_blind': 2,
         'big_blind': 2
     }
 
@@ -109,6 +116,8 @@ class Event(Enum):
     PLAYER_READY_FOR_NEXT_GAME = auto()
     START_GAME = auto()
     FOLD = auto()
+    CHECK = auto()
+    CALL = auto()
     NONE = auto()
     DRAW_FLOP = auto()
     DRAW_RIVER = auto()
@@ -153,6 +162,15 @@ def determine_next_dealer_seat(state):
     return determine_next(state, current_dealer_seat)
 
 
+def validate_check_or_call_or_fold(state, player_id):
+    if not GameState.is_ongoing(state["game_state"]):
+        raise EventRejected("Player check when game is not ongoing")
+    if player_id not in state["players"]:
+        raise EventRejected(f"Player {player_id} is unknown")
+    if state["players"][player_id]["state"] != PlayerState.MY_TURN:
+        raise EventRejected(f"Player {player_id} is trying to check on not their turn")
+
+
 def start_game(state):
     if len(state["players"]) < 2:
         return None, state
@@ -183,13 +201,13 @@ def start_game(state):
     state["game_state"] = GameState.PREFLOP
     # Blinds and set who's turn it is to play
     state["players"][
-        sitted_players_ids_starting_after_dealer[0]
+        sitted_players_ids_starting_after_dealer[-1]
     ]["state"] = PlayerState.MY_TURN
     state["players"][
-        sitted_players_ids_starting_after_dealer[-2]
+        sitted_players_ids_starting_after_dealer[-3 % len(sitted_players_ids_starting_after_dealer)]
     ]["committed_by"] = state["small_blind"]
     state["players"][
-        sitted_players_ids_starting_after_dealer[-1]
+        sitted_players_ids_starting_after_dealer[-2]
     ]["committed_by"] = state["big_blind"]
 
     return None, state
@@ -220,12 +238,13 @@ def exclude_player(state, the_player_id):
     if the_player_id not in state["players"]:
         raise EventRejected("Excluding a player who's not here")
     if (
-            sum([1 for player in state["players"].values() if PlayerState.is_in_game(player["state"])]) <= 2
+            count_if(state["players"].values(), lambda player: PlayerState.is_in_game(player["state"])) <= 2
             and PlayerState.is_in_game(state["players"][the_player_id]["state"])
     ):
-        # Only one playing player left, game ends
+        # Only one playing player left that's not waiting for new game, game ends
         state["dealing"] = ""
         state["game_state"] = GameState.NOT_STARTED
+        state["flop"] = []
         for player_id in state["players"]:
             state["players"][player_id] = {
                 "state": PlayerState.WAITING_NEW_GAME,
@@ -246,12 +265,16 @@ def exclude_player(state, the_player_id):
     # Remove player
     del state["players"][the_player_id]
 
+    event = None
     if len(state["players"]) >= 2 and state["game_state"] == GameState.NOT_STARTED:
         event = {
             "type": Event.START_GAME
         }
-    else:
-        event = None
+    elif all_folded_but_one(state["players"]):
+        # Game is over
+        state["game_state"] = GameState.GAME_OVER
+        state["results"] = generate_end_game_results(state)
+
     return event, state
 
 
@@ -318,7 +341,7 @@ def determine_next_players_for_this_round(state, current_player_id):
     players_in_order = remove_empty(
         list_of_players_ids_starting_at_dealer(
             state["seats"],
-            state["dealing"]
+            state["dealing"] if state["dealing"] else "1"
         )
     )
 
@@ -361,8 +384,8 @@ def generate_end_game_results(state):
 
 
 def fold_player(state, player_id):
-    if player_id not in state["players"] or state["players"][player_id]["state"] != PlayerState.MY_TURN:
-        raise EventRejected(f"It is not the turn of player with id {player_id}")
+
+    validate_check_or_call_or_fold(state, player_id)
 
     (players_after_current_not_folded,
      players_before_current_not_folded_not_aligned) = determine_next_players_for_this_round(state, player_id)
@@ -404,12 +427,8 @@ def player_ready(state, player_id):
 
 
 def player_check(state, player_id):
-    if not GameState.is_ongoing(state["game_state"]):
-        raise EventRejected("Player check when game is not ongoing")
-    if player_id not in state["players"]:
-        raise EventRejected(f"Player {player_id} is unknown")
-    if state["players"][player_id]["state"] != PlayerState.MY_TURN:
-        raise EventRejected(f"Player {player_id} is trying to check on not their turn")
+
+    validate_check_or_call_or_fold(state, player_id)
 
     current_player = state["players"][player_id]
     if current_player["committed_by"] < get_max_bet(state):
@@ -421,6 +440,53 @@ def player_check(state, player_id):
     event = None
     if players_after_current_not_folded:
         state["players"][players_after_current_not_folded[0]]["state"] = PlayerState.MY_TURN
+    else:
+        event = next_state_event(state["game_state"])
+
+    return event, state
+
+
+def draw_flop(state):
+    if "deck" not in state or not state["deck"] or len(state["deck"]) < 3:
+        raise EventRejected("Not deck, can't draw flop")
+
+    if "dealing" not in state or state["dealing"] == "":
+        state["dealing"] = "1"
+
+    in_game_players_starting_at_dealer = list(filter(
+        lambda player_id: PlayerState.could_play(state["players"][player_id]["state"]),
+        remove_empty(list_of_players_ids_starting_at_dealer(state["seats"], state["dealing"]))
+    ))
+
+    if not in_game_players_starting_at_dealer:
+        raise EventRejected("Something went very wrong, no next player on draw event")
+
+    next_player_id = in_game_players_starting_at_dealer[0]
+    state["players"][next_player_id]["state"] = PlayerState.MY_TURN
+    state["game_state"] = GameState.FLOP
+    state["flop"] = [state["deck"].pop(0), state["deck"].pop(0), state["deck"].pop(0)]
+
+    return None, state
+
+
+def player_call(state, player_id):
+
+    validate_check_or_call_or_fold(state, player_id)
+
+    current_player = state["players"][player_id]
+    max_bet = get_max_bet(state)
+    if current_player["committed_by"] < max_bet:
+        current_player["committed_by"] = max_bet
+
+    (players_after_current_not_folded,
+     players_before_current_not_folded_not_aligned) = determine_next_players_for_this_round(state, player_id)
+
+    state["players"][player_id]["state"] = PlayerState.IN_GAME
+    event = None
+    if players_after_current_not_folded:
+        state["players"][players_after_current_not_folded[0]]["state"] = PlayerState.MY_TURN
+    elif players_before_current_not_folded_not_aligned:
+        state["players"][players_before_current_not_folded_not_aligned[0]]["state"] = PlayerState.MY_TURN
     else:
         event = next_state_event(state["game_state"])
 
@@ -453,6 +519,21 @@ def process_event(state, event):
             state,
             event["player_id"]
         )
+    elif event["type"] == Event.CHECK:
+        event, new_state = player_check(
+            state,
+            event["player_id"]
+        )
+    elif event["type"] == Event.DRAW_FLOP:
+        event, new_state = draw_flop(state)
+    elif event["type"] == Event.CALL:
+        event, new_state = player_call(
+            state,
+            event["player_id"]
+        )
+    else:
+        print(f"WARNING: unknown event type: {event['type']}")
+        event, new_state = None, state
 
     if event:
         return process_event(new_state, event)

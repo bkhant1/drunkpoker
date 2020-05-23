@@ -2,14 +2,13 @@ port module Main exposing (..)
 
 import Browser
 import Dict exposing (Dict)
-import Html
 import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
-import Html.Styled exposing (Html, button, div, h1, img, input, text, toUnstyled)
+import Html.Styled exposing (Html, button, div, img, input, text, toUnstyled)
 import Http
 import Json.Decode as D
 import Json.Encode as Encode
-import Css exposing (hex, px, rgb)
+import Css exposing (rgb)
 import Svg.Styled as Svg
 import Svg.Styled.Attributes exposing (cx, cy, fill, rx, ry)
 
@@ -43,6 +42,7 @@ type alias JsonState =
     { seats: Dict String String
     , players: Dict String JsonPlayer
     , gameState: String
+    , flop: Maybe (List Card)
     }
 
 
@@ -91,6 +91,7 @@ type EnumGameState =
 type alias GameState =
     { seats: Dict SeatNumber (Maybe Player)
     , gameState: EnumGameState
+    , flop: Maybe (Card, Card, Card)
     }
 
 
@@ -137,16 +138,12 @@ makeEmptySeat seatNumber =
     (seatNumber, Nothing)
 
 
-initGameOver =
-    ( { baseUrl = "http://localhost:1234/table/123", gameState = { gameState = GameOver, seats = Dict.fromList [(1,Just { cards = Just ({ suit = "DIAMONDS", value = 11 },{ suit = "HEART", value = 4 }), committedBy = Just 1, name = "Hey", state = Playing 1 Folded }),(2,Just { cards = Nothing, committedBy = Just 2, name = "Ho !", state = Playing 2 InGame }),(3,Nothing),(4,Nothing),(5,Nothing),(6,Nothing),(7,Nothing),(8,Nothing),(9,Nothing),(10,Nothing)] }, hostName = "http://localhost:1234", playerName = "Hey", seated = Seated 1 }
-    , Cmd.none
-    )
-
 realInit =
     ( { gameState =
         { seats =
             Dict.fromList <| List.map makeEmptySeat <| List.range 1 6
         , gameState = GameInProgress
+        , flop = Nothing
         }
       , playerName = ""
       , baseUrl = ""
@@ -158,17 +155,18 @@ realInit =
 
 
 init : () -> ( Model, Cmd Msg )
-init flags = realInit--initGameOver
+init _ = realInit
 
 
 -- UPDATE
 
 
-type Msg
-  = Recv String
+type Msg =
+  Receive String
   | PrepareRaise
   | Fold
   | Check
+  | Call
   | ShowCards
   | NextGame
   | TableName String
@@ -185,9 +183,16 @@ getHostName url =
         _ -> ""
 
 
+cardDecoder: D.Decoder Card
+cardDecoder =
+    (D.map2 Card
+        (D.index 1 D.string)
+        (D.index 0 D.int)
+    )
+
 jsonStateDecoder: D.Decoder JsonState
 jsonStateDecoder =
-    D.map3 JsonState
+    D.map4 JsonState
         (D.field "seats" (D.dict D.string))
         (D.field "players"
             (D.dict
@@ -195,18 +200,16 @@ jsonStateDecoder =
                     (D.field "name" D.string)
                     (D.field "state" D.string)
                     (D.maybe (D.field "cards"
-                        (D.list
-                            (D.map2 Card
-                                (D.index 1 D.string)
-                                (D.index 0 D.int)
-                            )
-                        ))
+                        (D.list cardDecoder))
                     )
                     (D.maybe (D.field "committed_by" D.int))
                 )
             )
         )
         (D.field "game_state" D.string)
+        (D.maybe (D.field "flop"
+            (D.list cardDecoder)
+        ))
 
 
 gameStateFromJsonState: JsonState -> GameState
@@ -222,7 +225,7 @@ gameStateFromJsonState jsonState =
                 _ -> Iddle seatNumber
         maybeTwoCardsFromCardsList list =
             case list of
-                card1::card2::tail ->
+                card1::card2::_ ->
                     Just (card1, card2)
                 _ ->
                     Nothing
@@ -251,6 +254,13 @@ gameStateFromJsonState jsonState =
             ( seatNumber
             , makePlayer playerId seatNumber
             )
+        cards: Maybe (Card, Card, Card)
+        cards =
+            case jsonState.flop of
+                Just (c1::c2::c3::_) ->
+                    Just (c1, c2, c3)
+                _ ->
+                    Nothing
     in
     GameState
         (Dict.fromList (List.map stringSeatPlayerIdToSeatNumberPlayer seatsAsTuple))
@@ -258,12 +268,24 @@ gameStateFromJsonState jsonState =
             "GAME_OVER" -> GameOver
             _ -> GameInProgress
         )
+        cards
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model = Debug.log "The state: " <|
+    let
+        postAction action =
+            Http.post
+              { url = model.baseUrl ++ "/actions/" ++ action
+              , expect = Http.expectWhatever Discard
+              , body = Http.jsonBody
+              <| Encode.object
+                  [ ("player_name", Encode.string model.playerName)
+                  ]
+              }
+    in
     case msg of
-        Recv message ->
+        Receive message ->
             case D.decodeString jsonStateDecoder message of
                 Ok gameState -> Debug.log ("Decoded message: \n" ++ message ++ "\n to: \n"  ++ Debug.toString gameState) <|
                     ( { model | gameState = gameStateFromJsonState gameState }
@@ -280,14 +302,7 @@ update msg model = Debug.log "The state: " <|
             )
         Fold ->
             ( model
-            , Http.post
-                  { url = model.baseUrl ++ "/actions/fold"
-                  , expect = Http.expectWhatever Discard
-                  , body = Http.jsonBody
-                  <| Encode.object
-                      [ ("player_name", Encode.string model.playerName)
-                      ]
-                  }
+            , postAction "fold"
             )
         TableName baseUrl ->
             ( { model | baseUrl = baseUrl, hostName = getHostName baseUrl }
@@ -323,25 +338,15 @@ update msg model = Debug.log "The state: " <|
             )
         NextGame ->
             ( model
-            , Http.post
-                  { url = model.baseUrl ++ "/actions/nextGame"
-                  , expect = Http.expectWhatever Discard
-                  , body = Http.jsonBody
-                  <| Encode.object
-                      [ ("player_name", Encode.string model.playerName)
-                      ]
-                  }
+            , postAction "nextGame"
             )
         Check ->
             ( model
-            , Http.post
-                  { url = model.baseUrl ++ "/actions/check"
-                  , expect = Http.expectWhatever Discard
-                  , body = Http.jsonBody
-                  <| Encode.object
-                      [ ("player_name", Encode.string model.playerName)
-                      ]
-                  }
+            , postAction "check"
+            )
+        Call ->
+            ( model
+            , postAction "call"
             )
 
 
@@ -354,7 +359,7 @@ update msg model = Debug.log "The state: " <|
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
-        [ messageReceiver Recv
+        [ messageReceiver Receive
         , tableNameReceiver TableName
         ]
 
@@ -470,52 +475,65 @@ cardToFilename card =
     valueCode ++ suitCode
 
 
-renderPlayer: Model -> Player -> Position -> SeatNumber -> Html Msg
-renderPlayer model player position mySeatNumber =
+cardToUrl: Model -> Card -> String
+cardToUrl model card = model.hostName ++ "/static/cards/" ++ cardToFilename card ++ ".svg"
+
+
+renderCard cardTopVhPos cardLeftVwPos url =
+    renderCardWithSize cardTopVhPos cardLeftVwPos 12 url
+
+
+renderCardWithSize: Float -> Float -> Float -> String -> (Html Msg)
+renderCardWithSize cardTopVhPos cardLeftVwPos size url =
     let
-        cardProportion = 0.32
-        cardHeight = 12
-        cardsTop = Css.top (Css.vh 6)
-        cardsLeft = 1.8
-        cardsOffset = 1
-        cardLeft1 = Css.left (Css.vw cardsLeft)
-        cardLeft2 = Css.left (Css.vw (cardsLeft + cardsOffset))
         cardsSize =
+            let
+                cardHeight = size
+                cardProportion = 0.32
+            in
             Css.batch
             [ Css.width (Css.vw <| cardProportion*cardHeight)
             , Css.height (Css.vh <| cardHeight)
             ]
-        cardToUrl = \card -> model.hostName ++ "/static/cards/" ++ cardToFilename card ++ ".svg"
-        renderCard cardLeftPos url =
-            div
-                [ css
-                    [ cardsSize
-                    , Css.position Css.absolute
-                    , cardLeftPos
-                    , cardsTop
-                    ]
-                ]
-                [ img
-                    [ src url
-                    , css
-                         [ Css.height (Css.pct 100)
-                         , Css.width (Css.pct 100)
-                         ]
-                    ]
-                    []
-                ]
+    in
+    div
+        [ css
+            [ cardsSize
+            , Css.position Css.absolute
+            , Css.left (Css.vw cardLeftVwPos)
+            , Css.top (Css.vh cardTopVhPos)
+            ]
+        ]
+        [ img
+            [ src url
+            , css
+                 [ Css.height (Css.pct 100)
+                 , Css.width (Css.pct 100)
+                 ]
+            ]
+            []
+        ]
+
+
+renderPlayer: Model -> Player -> Position -> SeatNumber -> Html Msg
+renderPlayer model player position mySeatNumber =
+    let
+        cardsTop = 6
+        cardsLeft = 1.8
+        cardsOffset = 1
+        backCardUrl = model.hostName ++ "/static/cards/1B.svg"
         renderCards: Maybe (Card, Card) -> List (Html Msg)
         renderCards cards =
             case cards of
                 Just (card1, card2) ->
-                    [ renderCard cardLeft1 (cardToUrl card1)
-                    , renderCard cardLeft2 (cardToUrl card2)
+                    [ renderCard cardsTop cardsLeft (cardToUrl model card1)
+                    , renderCard cardsTop (cardsLeft + cardsOffset) (cardToUrl model card2)
                     ]
                 Nothing ->
                     case player.state of
                         Playing _ _ ->
-                            [ renderCard cardLeft1 <| model.hostName ++ "/static/cards/1B.svg"
-                            , renderCard cardLeft2 <| model.hostName ++ "/static/cards/1B.svg"
+                            [ renderCard cardsTop cardsLeft backCardUrl
+                            , renderCard cardsTop (cardsLeft + cardsOffset) backCardUrl
                             ]
                         _ ->
                             []
@@ -573,6 +591,24 @@ playerSits model =
     ]
 
 
+flop: Model -> List (Html Msg)
+flop model =
+    let
+        offset = 4.5
+        flopLeft = 37
+        flopTop = 35
+        size = 14
+    in
+    case model.gameState.flop of
+        Just (c1, c2, c3) ->
+            [ renderCardWithSize flopTop flopLeft size (cardToUrl model c1)
+            , renderCardWithSize flopTop (flopLeft + offset) size (cardToUrl model c2)
+            , renderCardWithSize flopTop (flopLeft + 2*offset) size (cardToUrl model c3)
+            ]
+        Nothing ->
+            []
+
+
 inGameActions: Model -> List (Html Msg)
 inGameActions model =
     let
@@ -593,6 +629,23 @@ inGameActions model =
                                 False
                     _ ->
                         False
+        getCommittedByOrZero: Maybe Player -> Int
+        getCommittedByOrZero player =
+            case player of
+                Just it ->
+                    Maybe.withDefault 0 << .committedBy <| it
+                Nothing ->
+                    0
+        maxBet: Int
+        maxBet =
+            Maybe.withDefault 0
+                <| List.maximum
+                <| List.map
+                    (getCommittedByOrZero << Tuple.second)
+                    (Dict.toList model.gameState.seats)
+        hasToCall: Bool
+        hasToCall =
+             (getCommittedByOrZero <| getMePlayer model) < maxBet
         offsetLeft: Float -> Css.Style
         offsetLeft pctOffset =
             Css.batch
@@ -623,12 +676,13 @@ inGameActions model =
                 [ interactCommonCss
                 , offsetLeft 20.2
                 ]
-            , onClick <| Check
+            , onClick <| if hasToCall then Call else Check
             ]
-            [ text "CHECK"]
+            [ text <| if hasToCall then "CALL" else "CHECK" ]
         ]
     else
         []
+
 
 gameOverActions: Model -> List (Html Msg)
 gameOverActions model =
@@ -700,6 +754,7 @@ view model =
       (playerSits model
       ++ inGameActions model
       ++ gameOverActions model
+      ++ flop model
       ++
       [ div
             [ css
