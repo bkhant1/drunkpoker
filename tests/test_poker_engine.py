@@ -1604,41 +1604,45 @@ class TestCall:
         assert new_state["players"][next_to_play]["state"] == engine.PlayerState.MY_TURN
 
 
-@pytest.mark.parametrize("action", [engine.draw_flop, engine.draw_river, engine.draw_turn])
-class TestDrawFlop:
+@pytest.mark.parametrize(
+    "action, number_of_cards, cards_already_there",
+    [(engine.draw_flop, 3, []),
+     (engine.draw_river, 1, ["c1", "c2", "c3"]),
+     (engine.draw_turn, 1, ["c1", "c2", "c3", "c4"])])
+class TestDrawFlopRiverOrTurn:
 
-    def test_draw_flop_no_deck(self):
+    def test_draw_flop_no_deck(self, action, number_of_cards, cards_already_there):
         the_state = {}
         with pytest.raises(engine.EventRejected):
-            _ = engine.draw_flop(the_state)
+            _ = action(the_state)
         the_state["deck"] = None
         with pytest.raises(engine.EventRejected):
-            _ = engine.draw_flop(the_state)
-        the_state["deck"] = ["Card1", "Card2"]
+            _ = action(the_state)
+        the_state["deck"] = [f"Card{i}" for i in range(0, number_of_cards - 1)]
         with pytest.raises(engine.EventRejected):
-            _ = engine.draw_flop(the_state)
+            _ = action(the_state)
 
-    def test_draw_flop_no_next_player(self, base_table, add_player):
+    def test_draw_flop_no_next_player(self, action, base_table, add_player, number_of_cards, cards_already_there):
         add_player("P1", seat_number=1, state=engine.PlayerState.FOLDED)
         with pytest.raises(engine.EventRejected):
-            _ = engine.draw_flop(base_table)
+            _ = action(base_table)
 
-    def test_draw_flop_overrides_state(self, base_table, add_player):
+    def test_draw_flop_overrides_state(self, action, base_table, add_player, number_of_cards, cards_already_there):
         add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
         add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.GAME_OVER
-        event, new_state = engine.draw_flop(base_table)
+        event, new_state = action(base_table)
 
         assert event is None
         assert new_state["game_state"] == engine.GameState.FLOP
 
-    def test_draw_flop_no_dealer_set(self, base_table, add_player):
+    def test_draw_flop_no_dealer_set(self, action, base_table, add_player, number_of_cards, cards_already_there):
         """
         If that's the case assume P1 is the dealer
         """
         add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
         add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
-        event, new_state = engine.draw_flop(base_table)
+        event, new_state = action(base_table)
         base_table["dealing"] == ''
 
         assert event is None
@@ -1647,14 +1651,23 @@ class TestDrawFlop:
         assert new_state["players"]["P2"]["state"] == engine.PlayerState.IN_GAME
         assert new_state["game_state"] == engine.GameState.FLOP
 
-    def test_draw_flop_determines_next_player(self, base_table, add_player):
+    def test_draw_flop_determines_next_player(
+            self,
+            action,
+            base_table,
+            add_player,
+            cards_already_there,
+            number_of_cards
+    ):
         add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
         add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.PREFLOP
-        flop = base_table["deck"][0:3]
+        base_table["flop"] = cards_already_there
         base_table["dealing"] = "1"
-        event, new_state = engine.draw_flop(base_table)
+
+        flop = cards_already_there + base_table["deck"][0:number_of_cards]
+        event, new_state = action(base_table)
 
         assert event is None
         assert new_state["dealing"] == "1"
@@ -1664,34 +1677,34 @@ class TestDrawFlop:
         assert new_state["flop"] == flop
         assert new_state["game_state"] == engine.GameState.FLOP
 
-    def test_draw_flop_dealer_folded(self, base_table, add_player):
+    def test_draw_flop_dealer_folded(self, action, base_table, add_player, number_of_cards, cards_already_there):
         add_player("P1", seat_number=1, state=engine.PlayerState.FOLDED)
         add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.PREFLOP
         base_table["dealing"] = "1"
-        event, new_state = engine.draw_flop(base_table)
+        event, new_state = action(base_table)
 
         assert event is None
         assert new_state["players"]["P2"]["state"] == engine.PlayerState.MY_TURN
 
-    def test_draw_flop_no_dealer(self, base_table, add_player):
+    def test_draw_flop_no_dealer(self, action, base_table, add_player, number_of_cards, cards_already_there):
         add_player("P2", seat_number=2, state=engine.PlayerState.FOLDED)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
         add_player("P4", seat_number=4, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.PREFLOP
         base_table["dealing"] = "1"
-        event, new_state = engine.draw_flop(base_table)
+        event, new_state = action(base_table)
 
         assert event is None
         assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
 
-    def test_draw_flop_two_players(self, base_table, add_player):
+    def test_draw_flop_two_players(self, action, base_table, add_player, number_of_cards, cards_already_there):
         add_player("P2", seat_number=2, state=engine.PlayerState.FOLDED)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.PREFLOP
         base_table["dealing"] = "3"
-        event, new_state = engine.draw_flop(base_table)
+        event, new_state = action(base_table)
 
         assert event is None
         assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
@@ -1701,7 +1714,9 @@ class TestDrawFlop:
         [("1", "P1"), ("2", "P6"), ("3", "P6"), ("4", "P6"),
          ("5", "P6"), ("6", "P6"), ("7", "P1"), ("8", "P1")]
     )
-    def test_draw_flop_big_table_with_holes(self, dealer, expected_new_player, base_table, add_player):
+    def test_draw_flop_big_table_with_holes(
+            self, action, dealer, expected_new_player, base_table, add_player,
+            number_of_cards, cards_already_there):
         add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
         add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
         add_player("P5", seat_number=5, state=engine.PlayerState.WAITING_NEW_GAME)
@@ -1709,7 +1724,7 @@ class TestDrawFlop:
         add_player("P8", seat_number=8, state=engine.PlayerState.FOLDED)
         base_table["game_state"] = engine.GameState.PREFLOP
         base_table["dealing"] = dealer
-        event, new_state = engine.draw_flop(base_table)
+        event, new_state = action(base_table)
 
         assert event is None
         assert new_state["players"][expected_new_player]["state"] == engine.PlayerState.MY_TURN

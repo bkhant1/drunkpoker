@@ -446,8 +446,8 @@ def player_check(state, player_id):
     return event, state
 
 
-def draw_flop(state):
-    if "deck" not in state or not state["deck"] or len(state["deck"]) < 3:
+def draw_x(state, number_of_cards):
+    if "deck" not in state or not state["deck"] or len(state["deck"]) < number_of_cards:
         raise EventRejected("Not deck, can't draw flop")
 
     if "dealing" not in state or state["dealing"] == "":
@@ -464,9 +464,21 @@ def draw_flop(state):
     next_player_id = in_game_players_starting_at_dealer[0]
     state["players"][next_player_id]["state"] = PlayerState.MY_TURN
     state["game_state"] = GameState.FLOP
-    state["flop"] = [state["deck"].pop(0), state["deck"].pop(0), state["deck"].pop(0)]
+    state["flop"] = state["flop"] + [state["deck"].pop(0) for _ in range(0, number_of_cards)]
 
     return None, state
+
+
+def draw_flop(state):
+    return draw_x(state, 3)
+
+
+def draw_river(state):
+    return draw_x(state, 1)
+
+
+def draw_turn(state):
+    return draw_x(state, 1)
 
 
 def player_call(state, player_id):
@@ -526,6 +538,10 @@ def process_event(state, event):
         )
     elif event["type"] == Event.DRAW_FLOP:
         event, new_state = draw_flop(state)
+    elif event["type"] == Event.DRAW_RIVER:
+        event, new_state = draw_river(state)
+    elif event["type"] == Event.DRAW_TURN:
+        event, new_state = draw_turn(state)
     elif event["type"] == Event.CALL:
         event, new_state = player_call(
             state,
