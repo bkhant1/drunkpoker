@@ -9813,11 +9813,13 @@ var $author$project$Main$realInit = _Utils_Tuple2(
 		gameState: {
 			flop: $elm$core$Maybe$Nothing,
 			gameState: $author$project$Main$GameInProgress,
+			river: $elm$core$Maybe$Nothing,
 			seats: $elm$core$Dict$fromList(
 				A2(
 					$elm$core$List$map,
 					$author$project$Main$makeEmptySeat,
-					A2($elm$core$List$range, 1, 6)))
+					A2($elm$core$List$range, 1, 6))),
+			turn: $elm$core$Maybe$Nothing
 		},
 		hostName: '?',
 		playerName: '',
@@ -12112,9 +12114,9 @@ var $elm$http$Http$expectWhatever = function (toMsg) {
 };
 var $author$project$Main$Folded = {$: 'Folded'};
 var $author$project$Main$GameOver = {$: 'GameOver'};
-var $author$project$Main$GameState = F3(
-	function (seats, gameState, flop) {
-		return {flop: flop, gameState: gameState, seats: seats};
+var $author$project$Main$GameState = F5(
+	function (seats, gameState, flop, river, turn) {
+		return {flop: flop, gameState: gameState, river: river, seats: seats, turn: turn};
 	});
 var $author$project$Main$Iddle = function (a) {
 	return {$: 'Iddle', a: a};
@@ -12134,6 +12136,20 @@ var $author$project$Main$WaitingNextGame = function (a) {
 };
 var $elm$core$Debug$log = _Debug_log;
 var $author$project$Main$gameStateFromJsonState = function (jsonState) {
+	var turn = function () {
+		var _v17 = jsonState.communityCards;
+		if ((((((_v17.$ === 'Just') && _v17.a.b) && _v17.a.b.b) && _v17.a.b.b.b) && _v17.a.b.b.b.b) && _v17.a.b.b.b.b.b) {
+			var _v18 = _v17.a;
+			var _v19 = _v18.b;
+			var _v20 = _v19.b;
+			var _v21 = _v20.b;
+			var _v22 = _v21.b;
+			var c5 = _v22.a;
+			return $elm$core$Maybe$Just(c5);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	}();
 	var stringStateToUiState = F2(
 		function (stringState, seatNumber) {
 			switch (stringState) {
@@ -12150,6 +12166,19 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 			}
 		});
 	var seatsAsTuple = $elm$core$Dict$toList(jsonState.seats);
+	var river = function () {
+		var _v11 = jsonState.communityCards;
+		if (((((_v11.$ === 'Just') && _v11.a.b) && _v11.a.b.b) && _v11.a.b.b.b) && _v11.a.b.b.b.b) {
+			var _v12 = _v11.a;
+			var _v13 = _v12.b;
+			var _v14 = _v13.b;
+			var _v15 = _v14.b;
+			var c4 = _v15.a;
+			return $elm$core$Maybe$Just(c4);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	}();
 	var maybeTwoCardsFromCardsList = function (list) {
 		if (list.b && list.b.b) {
 			var card1 = list.a;
@@ -12205,8 +12234,8 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 			seatNumber,
 			A2(makePlayer, playerId, seatNumber));
 	};
-	var cards = function () {
-		var _v1 = jsonState.flop;
+	var flop = function () {
+		var _v1 = jsonState.communityCards;
 		if ((((_v1.$ === 'Just') && _v1.a.b) && _v1.a.b.b) && _v1.a.b.b.b) {
 			var _v2 = _v1.a;
 			var c1 = _v2.a;
@@ -12220,7 +12249,7 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 			return $elm$core$Maybe$Nothing;
 		}
 	}();
-	return A3(
+	return A5(
 		$author$project$Main$GameState,
 		$elm$core$Dict$fromList(
 			A2($elm$core$List$map, stringSeatPlayerIdToSeatNumberPlayer, seatsAsTuple)),
@@ -12232,7 +12261,9 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 				return $author$project$Main$GameInProgress;
 			}
 		}(),
-		cards);
+		flop,
+		river,
+		turn);
 };
 var $author$project$Main$getHostName = function (url) {
 	var _v0 = A2($elm$core$String$split, '/', url);
@@ -12258,8 +12289,8 @@ var $author$project$Main$JsonPlayer = F4(
 		return {cards: cards, committedBy: committedBy, name: name, state: state};
 	});
 var $author$project$Main$JsonState = F4(
-	function (seats, players, gameState, flop) {
-		return {flop: flop, gameState: gameState, players: players, seats: seats};
+	function (seats, players, gameState, communityCards) {
+		return {communityCards: communityCards, gameState: gameState, players: players, seats: seats};
 	});
 var $author$project$Main$Card = F2(
 	function (suit, value) {
@@ -12309,7 +12340,7 @@ var $author$project$Main$jsonStateDecoder = A5(
 	$elm$json$Json$Decode$maybe(
 		A2(
 			$elm$json$Json$Decode$field,
-			'flop',
+			'community_cards',
 			$elm$json$Json$Decode$list($author$project$Main$cardDecoder))));
 var $elm$http$Http$Request = function (a) {
 	return {$: 'Request', a: a};
@@ -12595,81 +12626,6 @@ var $rtfeldman$elm_css$Css$property = F2(
 var $rtfeldman$elm_css$Css$backgroundColor = function (c) {
 	return A2($rtfeldman$elm_css$Css$property, 'background-color', c.value);
 };
-var $rtfeldman$elm_css$VirtualDom$Styled$Attribute = F3(
-	function (a, b, c) {
-		return {$: 'Attribute', a: a, b: b, c: c};
-	});
-var $rtfeldman$elm_css$VirtualDom$Styled$murmurSeed = 15739;
-var $rtfeldman$elm_css$VirtualDom$Styled$getClassname = function (styles) {
-	return $elm$core$List$isEmpty(styles) ? 'unstyled' : A2(
-		$elm$core$String$cons,
-		_Utils_chr('_'),
-		$rtfeldman$elm_hex$Hex$toString(
-			A2(
-				$Skinney$murmur3$Murmur3$hashString,
-				$rtfeldman$elm_css$VirtualDom$Styled$murmurSeed,
-				$rtfeldman$elm_css$Css$Preprocess$Resolve$compile(
-					$elm$core$List$singleton(
-						$rtfeldman$elm_css$Css$Preprocess$stylesheet(
-							$elm$core$List$singleton(
-								A2(
-									$rtfeldman$elm_css$VirtualDom$Styled$makeSnippet,
-									styles,
-									$rtfeldman$elm_css$Css$Structure$UniversalSelectorSequence(_List_Nil)))))))));
-};
-var $elm$virtual_dom$VirtualDom$property = F2(
-	function (key, value) {
-		return A2(
-			_VirtualDom_property,
-			_VirtualDom_noInnerHtmlOrFormAction(key),
-			_VirtualDom_noJavaScriptOrHtmlUri(value));
-	});
-var $rtfeldman$elm_css$Html$Styled$Internal$css = function (styles) {
-	var classname = $rtfeldman$elm_css$VirtualDom$Styled$getClassname(styles);
-	var classProperty = A2(
-		$elm$virtual_dom$VirtualDom$property,
-		'className',
-		$elm$json$Json$Encode$string(classname));
-	return A3($rtfeldman$elm_css$VirtualDom$Styled$Attribute, classProperty, styles, classname);
-};
-var $rtfeldman$elm_css$Html$Styled$Attributes$css = $rtfeldman$elm_css$Html$Styled$Internal$css;
-var $elm$virtual_dom$VirtualDom$attribute = F2(
-	function (key, value) {
-		return A2(
-			_VirtualDom_attribute,
-			_VirtualDom_noOnOrFormAction(key),
-			_VirtualDom_noJavaScriptOrHtmlUri(value));
-	});
-var $rtfeldman$elm_css$VirtualDom$Styled$attribute = F2(
-	function (key, value) {
-		return A3(
-			$rtfeldman$elm_css$VirtualDom$Styled$Attribute,
-			A2($elm$virtual_dom$VirtualDom$attribute, key, value),
-			_List_Nil,
-			'');
-	});
-var $rtfeldman$elm_css$Svg$Styled$Attributes$cx = $rtfeldman$elm_css$VirtualDom$Styled$attribute('cx');
-var $rtfeldman$elm_css$Svg$Styled$Attributes$cy = $rtfeldman$elm_css$VirtualDom$Styled$attribute('cy');
-var $rtfeldman$elm_css$VirtualDom$Styled$Node = F3(
-	function (a, b, c) {
-		return {$: 'Node', a: a, b: b, c: c};
-	});
-var $rtfeldman$elm_css$VirtualDom$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$Node;
-var $rtfeldman$elm_css$Html$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$node;
-var $rtfeldman$elm_css$Html$Styled$div = $rtfeldman$elm_css$Html$Styled$node('div');
-var $rtfeldman$elm_css$VirtualDom$Styled$NodeNS = F4(
-	function (a, b, c, d) {
-		return {$: 'NodeNS', a: a, b: b, c: c, d: d};
-	});
-var $rtfeldman$elm_css$VirtualDom$Styled$nodeNS = $rtfeldman$elm_css$VirtualDom$Styled$NodeNS;
-var $rtfeldman$elm_css$Svg$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$nodeNS('http://www.w3.org/2000/svg');
-var $rtfeldman$elm_css$Svg$Styled$ellipse = $rtfeldman$elm_css$Svg$Styled$node('ellipse');
-var $rtfeldman$elm_css$Svg$Styled$Attributes$fill = $rtfeldman$elm_css$VirtualDom$Styled$attribute('fill');
-var $rtfeldman$elm_css$Css$prop1 = F2(
-	function (key, arg) {
-		return A2($rtfeldman$elm_css$Css$property, key, arg.value);
-	});
-var $rtfeldman$elm_css$Css$flex = $rtfeldman$elm_css$Css$prop1('flex');
 var $author$project$Main$cardToFilename = function (card) {
 	var valueCode = function () {
 		if ((card.value < 10) && (card.value > 1)) {
@@ -12724,6 +12680,55 @@ var $rtfeldman$elm_css$Css$Preprocess$ApplyStyles = function (a) {
 	return {$: 'ApplyStyles', a: a};
 };
 var $rtfeldman$elm_css$Css$batch = $rtfeldman$elm_css$Css$Preprocess$ApplyStyles;
+var $rtfeldman$elm_css$VirtualDom$Styled$Attribute = F3(
+	function (a, b, c) {
+		return {$: 'Attribute', a: a, b: b, c: c};
+	});
+var $rtfeldman$elm_css$VirtualDom$Styled$murmurSeed = 15739;
+var $rtfeldman$elm_css$VirtualDom$Styled$getClassname = function (styles) {
+	return $elm$core$List$isEmpty(styles) ? 'unstyled' : A2(
+		$elm$core$String$cons,
+		_Utils_chr('_'),
+		$rtfeldman$elm_hex$Hex$toString(
+			A2(
+				$Skinney$murmur3$Murmur3$hashString,
+				$rtfeldman$elm_css$VirtualDom$Styled$murmurSeed,
+				$rtfeldman$elm_css$Css$Preprocess$Resolve$compile(
+					$elm$core$List$singleton(
+						$rtfeldman$elm_css$Css$Preprocess$stylesheet(
+							$elm$core$List$singleton(
+								A2(
+									$rtfeldman$elm_css$VirtualDom$Styled$makeSnippet,
+									styles,
+									$rtfeldman$elm_css$Css$Structure$UniversalSelectorSequence(_List_Nil)))))))));
+};
+var $elm$virtual_dom$VirtualDom$property = F2(
+	function (key, value) {
+		return A2(
+			_VirtualDom_property,
+			_VirtualDom_noInnerHtmlOrFormAction(key),
+			_VirtualDom_noJavaScriptOrHtmlUri(value));
+	});
+var $rtfeldman$elm_css$Html$Styled$Internal$css = function (styles) {
+	var classname = $rtfeldman$elm_css$VirtualDom$Styled$getClassname(styles);
+	var classProperty = A2(
+		$elm$virtual_dom$VirtualDom$property,
+		'className',
+		$elm$json$Json$Encode$string(classname));
+	return A3($rtfeldman$elm_css$VirtualDom$Styled$Attribute, classProperty, styles, classname);
+};
+var $rtfeldman$elm_css$Html$Styled$Attributes$css = $rtfeldman$elm_css$Html$Styled$Internal$css;
+var $rtfeldman$elm_css$VirtualDom$Styled$Node = F3(
+	function (a, b, c) {
+		return {$: 'Node', a: a, b: b, c: c};
+	});
+var $rtfeldman$elm_css$VirtualDom$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$Node;
+var $rtfeldman$elm_css$Html$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$node;
+var $rtfeldman$elm_css$Html$Styled$div = $rtfeldman$elm_css$Html$Styled$node('div');
+var $rtfeldman$elm_css$Css$prop1 = F2(
+	function (key, arg) {
+		return A2($rtfeldman$elm_css$Css$property, key, arg.value);
+	});
 var $rtfeldman$elm_css$Css$height = $rtfeldman$elm_css$Css$prop1('height');
 var $rtfeldman$elm_css$Html$Styled$img = $rtfeldman$elm_css$Html$Styled$node('img');
 var $rtfeldman$elm_css$Css$left = $rtfeldman$elm_css$Css$prop1('left');
@@ -12827,42 +12832,107 @@ var $author$project$Main$renderCardWithSize = F4(
 					_List_Nil)
 				]));
 	});
-var $author$project$Main$flop = function (model) {
+var $author$project$Main$communityCards = function (model) {
 	var size = 14;
 	var offset = 4.5;
 	var flopTop = 35;
 	var flopLeft = 37;
-	var _v0 = model.gameState.flop;
-	if (_v0.$ === 'Just') {
-		var _v1 = _v0.a;
-		var c1 = _v1.a;
-		var c2 = _v1.b;
-		var c3 = _v1.c;
-		return _List_fromArray(
-			[
-				A4(
-				$author$project$Main$renderCardWithSize,
-				flopTop,
-				flopLeft,
-				size,
-				A2($author$project$Main$cardToUrl, model, c1)),
-				A4(
-				$author$project$Main$renderCardWithSize,
-				flopTop,
-				flopLeft + offset,
-				size,
-				A2($author$project$Main$cardToUrl, model, c2)),
-				A4(
-				$author$project$Main$renderCardWithSize,
-				flopTop,
-				flopLeft + (2 * offset),
-				size,
-				A2($author$project$Main$cardToUrl, model, c3))
-			]);
-	} else {
-		return _List_Nil;
-	}
+	var riverCards = function () {
+		var _v3 = model.gameState.river;
+		if (_v3.$ === 'Just') {
+			var card = _v3.a;
+			return _List_fromArray(
+				[
+					A4(
+					$author$project$Main$renderCardWithSize,
+					flopTop,
+					flopLeft + (3 * offset),
+					size,
+					A2($author$project$Main$cardToUrl, model, card))
+				]);
+		} else {
+			return _List_Nil;
+		}
+	}();
+	var turnCards = function () {
+		var _v2 = model.gameState.turn;
+		if (_v2.$ === 'Just') {
+			var card = _v2.a;
+			return _List_fromArray(
+				[
+					A4(
+					$author$project$Main$renderCardWithSize,
+					flopTop,
+					flopLeft + (4 * offset),
+					size,
+					A2($author$project$Main$cardToUrl, model, card))
+				]);
+		} else {
+			return _List_Nil;
+		}
+	}();
+	var flopCards = function () {
+		var _v0 = model.gameState.flop;
+		if (_v0.$ === 'Just') {
+			var _v1 = _v0.a;
+			var c1 = _v1.a;
+			var c2 = _v1.b;
+			var c3 = _v1.c;
+			return _List_fromArray(
+				[
+					A4(
+					$author$project$Main$renderCardWithSize,
+					flopTop,
+					flopLeft,
+					size,
+					A2($author$project$Main$cardToUrl, model, c1)),
+					A4(
+					$author$project$Main$renderCardWithSize,
+					flopTop,
+					flopLeft + offset,
+					size,
+					A2($author$project$Main$cardToUrl, model, c2)),
+					A4(
+					$author$project$Main$renderCardWithSize,
+					flopTop,
+					flopLeft + (2 * offset),
+					size,
+					A2($author$project$Main$cardToUrl, model, c3))
+				]);
+		} else {
+			return _List_Nil;
+		}
+	}();
+	return _Utils_ap(
+		flopCards,
+		_Utils_ap(riverCards, turnCards));
 };
+var $elm$virtual_dom$VirtualDom$attribute = F2(
+	function (key, value) {
+		return A2(
+			_VirtualDom_attribute,
+			_VirtualDom_noOnOrFormAction(key),
+			_VirtualDom_noJavaScriptOrHtmlUri(value));
+	});
+var $rtfeldman$elm_css$VirtualDom$Styled$attribute = F2(
+	function (key, value) {
+		return A3(
+			$rtfeldman$elm_css$VirtualDom$Styled$Attribute,
+			A2($elm$virtual_dom$VirtualDom$attribute, key, value),
+			_List_Nil,
+			'');
+	});
+var $rtfeldman$elm_css$Svg$Styled$Attributes$cx = $rtfeldman$elm_css$VirtualDom$Styled$attribute('cx');
+var $rtfeldman$elm_css$Svg$Styled$Attributes$cy = $rtfeldman$elm_css$VirtualDom$Styled$attribute('cy');
+var $rtfeldman$elm_css$VirtualDom$Styled$NodeNS = F4(
+	function (a, b, c, d) {
+		return {$: 'NodeNS', a: a, b: b, c: c, d: d};
+	});
+var $rtfeldman$elm_css$VirtualDom$Styled$nodeNS = $rtfeldman$elm_css$VirtualDom$Styled$NodeNS;
+var $rtfeldman$elm_css$Svg$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$nodeNS('http://www.w3.org/2000/svg');
+var $rtfeldman$elm_css$Svg$Styled$ellipse = $rtfeldman$elm_css$Svg$Styled$node('ellipse');
+var $rtfeldman$elm_css$Svg$Styled$Attributes$fill = $rtfeldman$elm_css$VirtualDom$Styled$attribute('fill');
+var $rtfeldman$elm_css$Css$flex = $rtfeldman$elm_css$Css$prop1('flex');
 var $author$project$Main$NextGame = {$: 'NextGame'};
 var $author$project$Main$ShowCards = {$: 'ShowCards'};
 var $rtfeldman$elm_css$Html$Styled$button = $rtfeldman$elm_css$Html$Styled$node('button');
@@ -13335,7 +13405,7 @@ var $author$project$Main$renderEmptySit = F3(
 		}
 	});
 var $rtfeldman$elm_css$Css$relative = {position: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'relative'};
-var $author$project$Main$renderCard = F3(
+var $author$project$Main$renderPlayerCard = F3(
 	function (cardTopVhPos, cardLeftVwPos, url) {
 		return A4($author$project$Main$renderCardWithSize, cardTopVhPos, cardLeftVwPos, 12, url);
 	});
@@ -13353,12 +13423,12 @@ var $author$project$Main$renderPlayer = F4(
 				return _List_fromArray(
 					[
 						A3(
-						$author$project$Main$renderCard,
+						$author$project$Main$renderPlayerCard,
 						cardsTop,
 						cardsLeft,
 						A2($author$project$Main$cardToUrl, model, card1)),
 						A3(
-						$author$project$Main$renderCard,
+						$author$project$Main$renderPlayerCard,
 						cardsTop,
 						cardsLeft + cardsOffset,
 						A2($author$project$Main$cardToUrl, model, card2))
@@ -13368,8 +13438,8 @@ var $author$project$Main$renderPlayer = F4(
 				if (_v2.$ === 'Playing') {
 					return _List_fromArray(
 						[
-							A3($author$project$Main$renderCard, cardsTop, cardsLeft, backCardUrl),
-							A3($author$project$Main$renderCard, cardsTop, cardsLeft + cardsOffset, backCardUrl)
+							A3($author$project$Main$renderPlayerCard, cardsTop, cardsLeft, backCardUrl),
+							A3($author$project$Main$renderPlayerCard, cardsTop, cardsLeft + cardsOffset, backCardUrl)
 						]);
 				} else {
 					return _List_Nil;
@@ -13518,7 +13588,7 @@ var $author$project$Main$view = function (model) {
 				_Utils_ap(
 					$author$project$Main$gameOverActions(model),
 					_Utils_ap(
-						$author$project$Main$flop(model),
+						$author$project$Main$communityCards(model),
 						_List_fromArray(
 							[
 								A2(

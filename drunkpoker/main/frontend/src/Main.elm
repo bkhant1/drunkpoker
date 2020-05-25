@@ -42,7 +42,7 @@ type alias JsonState =
     { seats: Dict String String
     , players: Dict String JsonPlayer
     , gameState: String
-    , flop: Maybe (List Card)
+    , communityCards: Maybe (List Card)
     }
 
 
@@ -92,6 +92,8 @@ type alias GameState =
     { seats: Dict SeatNumber (Maybe Player)
     , gameState: EnumGameState
     , flop: Maybe (Card, Card, Card)
+    , river: Maybe (Card)
+    , turn: Maybe (Card)
     }
 
 
@@ -144,6 +146,8 @@ realInit =
             Dict.fromList <| List.map makeEmptySeat <| List.range 1 6
         , gameState = GameInProgress
         , flop = Nothing
+        , river = Nothing
+        , turn = Nothing
         }
       , playerName = ""
       , baseUrl = ""
@@ -207,7 +211,7 @@ jsonStateDecoder =
             )
         )
         (D.field "game_state" D.string)
-        (D.maybe (D.field "flop"
+        (D.maybe (D.field "community_cards"
             (D.list cardDecoder)
         ))
 
@@ -254,11 +258,25 @@ gameStateFromJsonState jsonState =
             ( seatNumber
             , makePlayer playerId seatNumber
             )
-        cards: Maybe (Card, Card, Card)
-        cards =
-            case jsonState.flop of
+        flop: Maybe (Card, Card, Card)
+        flop =
+            case jsonState.communityCards of
                 Just (c1::c2::c3::_) ->
                     Just (c1, c2, c3)
+                _ ->
+                    Nothing
+        river: Maybe (Card)
+        river =
+            case jsonState.communityCards of
+                Just (_::_::_::c4::_) ->
+                    Just (c4)
+                _ ->
+                    Nothing
+        turn: Maybe (Card)
+        turn =
+            case jsonState.communityCards of
+                Just (_::_::_::_::c5::_) ->
+                    Just (c5)
                 _ ->
                     Nothing
     in
@@ -268,7 +286,9 @@ gameStateFromJsonState jsonState =
             "GAME_OVER" -> GameOver
             _ -> GameInProgress
         )
-        cards
+        flop
+        river
+        turn
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -479,7 +499,7 @@ cardToUrl: Model -> Card -> String
 cardToUrl model card = model.hostName ++ "/static/cards/" ++ cardToFilename card ++ ".svg"
 
 
-renderCard cardTopVhPos cardLeftVwPos url =
+renderPlayerCard cardTopVhPos cardLeftVwPos url =
     renderCardWithSize cardTopVhPos cardLeftVwPos 12 url
 
 
@@ -526,14 +546,14 @@ renderPlayer model player position mySeatNumber =
         renderCards cards =
             case cards of
                 Just (card1, card2) ->
-                    [ renderCard cardsTop cardsLeft (cardToUrl model card1)
-                    , renderCard cardsTop (cardsLeft + cardsOffset) (cardToUrl model card2)
+                    [ renderPlayerCard cardsTop cardsLeft (cardToUrl model card1)
+                    , renderPlayerCard cardsTop (cardsLeft + cardsOffset) (cardToUrl model card2)
                     ]
                 Nothing ->
                     case player.state of
                         Playing _ _ ->
-                            [ renderCard cardsTop cardsLeft backCardUrl
-                            , renderCard cardsTop (cardsLeft + cardsOffset) backCardUrl
+                            [ renderPlayerCard cardsTop cardsLeft backCardUrl
+                            , renderPlayerCard cardsTop (cardsLeft + cardsOffset) backCardUrl
                             ]
                         _ ->
                             []
@@ -591,22 +611,38 @@ playerSits model =
     ]
 
 
-flop: Model -> List (Html Msg)
-flop model =
+communityCards: Model -> List (Html Msg)
+communityCards model =
     let
         offset = 4.5
         flopLeft = 37
         flopTop = 35
         size = 14
+        flopCards =
+            case model.gameState.flop of
+                Just (c1, c2, c3) ->
+                    [ renderCardWithSize flopTop flopLeft size (cardToUrl model c1)
+                    , renderCardWithSize flopTop (flopLeft + offset) size (cardToUrl model c2)
+                    , renderCardWithSize flopTop (flopLeft + 2*offset) size (cardToUrl model c3)
+                    ]
+                Nothing ->
+                    []
+        riverCards =
+            case model.gameState.river of
+                Just (card) ->
+                    [ renderCardWithSize flopTop (flopLeft + 3*offset) size (cardToUrl model card)
+                    ]
+                Nothing ->
+                    []
+        turnCards =
+            case model.gameState.turn of
+                Just (card) ->
+                    [ renderCardWithSize flopTop (flopLeft + 4*offset) size (cardToUrl model card)
+                    ]
+                Nothing ->
+                    []
     in
-    case model.gameState.flop of
-        Just (c1, c2, c3) ->
-            [ renderCardWithSize flopTop flopLeft size (cardToUrl model c1)
-            , renderCardWithSize flopTop (flopLeft + offset) size (cardToUrl model c2)
-            , renderCardWithSize flopTop (flopLeft + 2*offset) size (cardToUrl model c3)
-            ]
-        Nothing ->
-            []
+    flopCards ++ riverCards ++ turnCards
 
 
 inGameActions: Model -> List (Html Msg)
@@ -754,7 +790,7 @@ view model =
       (playerSits model
       ++ inGameActions model
       ++ gameOverActions model
-      ++ flop model
+      ++ communityCards model
       ++
       [ div
             [ css

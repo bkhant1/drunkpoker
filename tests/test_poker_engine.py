@@ -1,10 +1,10 @@
 import pytest
 import copy
 from unittest import mock
+import random
 
 from drunkpoker.main import engine
-from drunkpoker.main.engine import Card
-from drunkpoker.main.engine import Suit
+from drunkpoker.main.engine import Card, Suit
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def shuffled_test_deck():
 @pytest.fixture
 def add_player(base_table):
 
-    def do_it(player_id, seat_number="1", state=engine.PlayerState.IN_GAME, committed_by=None):
+    def do_it(player_id, seat_number="1", state=engine.PlayerState.IN_GAME, committed_by=None, cards=[]):
         base_table["seats"][str(seat_number)] = player_id
         base_table["players"][player_id] = {
             **{
@@ -31,8 +31,12 @@ def add_player(base_table):
             },
             **({
                 "committed_by": committed_by
-            } if committed_by else {})
+            } if committed_by else {}),
+            **({
+                "cards": cards
+            } if cards else {})
         }
+        return base_table["players"][player_id]
 
     return do_it
 
@@ -41,7 +45,7 @@ def add_player(base_table):
 def empty_table():
     return {
         'deck': list(engine.deck),
-        'flop': [],
+        'community_cards': [],
         'seats': {
             "1": "",
             "2": "",
@@ -58,7 +62,8 @@ def empty_table():
         'players': {},
         'game_state': engine.GameState.NOT_STARTED,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'all_in': 20
     }
 
 
@@ -73,10 +78,15 @@ def game_state_preflop(base_table):
 
 
 @pytest.fixture
+def game_state_turn(base_table):
+    base_table["game_state"] = engine.GameState.TURN
+
+
+@pytest.fixture
 def table_with_one_player():
     return {
         'deck': list(engine.deck),
-        'flop': [],
+        'community_cards': [],
         'seats': {
             "1": "",
             "2": "",
@@ -98,7 +108,8 @@ def table_with_one_player():
         },
         'game_state': engine.GameState.NOT_STARTED,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'all_in': 20
     }
 
 
@@ -106,7 +117,7 @@ def table_with_one_player():
 def iddle_game_with_two_players():
     return {
         'deck': engine.deck,
-        'flop': [],
+        'community_cards': [],
         'seats': {
             "1": "",
             "2": "",
@@ -140,7 +151,7 @@ def iddle_game_with_two_players():
 def iddle_game_with_4_players_and_a_dealer():
     return {
         'deck': engine.deck,
-        'flop': [],
+        'community_cards': [],
         'seats': {
             "1": "p1",
             "2": "",
@@ -182,7 +193,7 @@ def iddle_game_with_4_players_and_a_dealer():
 def ongoing_game_with_two_players():
     return {
         'deck': engine.deck,
-        'flop': ["C1", "C2", "C3"],
+        'community_cards': ["C1", "C2", "C3"],
         'seats': {  # Note dictionaries are unordered
             "1": "",
             "4": "other_id",
@@ -216,7 +227,7 @@ def ongoing_game_with_two_players():
 def ongoing_game_with_three_players_one_folded():
     return {
         'deck': engine.deck,
-        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'community_cards': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
         'seats': {
             "1": "",
             "2": "",
@@ -256,7 +267,7 @@ def ongoing_game_with_three_players_one_folded():
 def ongoing_game_with_three_players_all_in_game():
     return {
         'deck': engine.deck,
-        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'community_cards': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
         'seats': {
             "1": "",
             "2": "",
@@ -296,7 +307,7 @@ def ongoing_game_with_three_players_all_in_game():
 def ongoing_game_all_called_turn_to_small_blind_to_raise_or_call():
     return {
         'deck': engine.deck,
-        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'community_cards': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
         'seats': {
             "1": "",
             "2": "",
@@ -336,7 +347,7 @@ def ongoing_game_all_called_turn_to_small_blind_to_raise_or_call():
 def ongoing_game_all_called_turn_to_small_blind_to_check_or_raise():
     return {
         'deck': engine.deck,
-        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'community_cards': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
         'seats': {
             "1": "",
             "2": "",
@@ -376,7 +387,7 @@ def ongoing_game_all_called_turn_to_small_blind_to_check_or_raise():
 def ongoing_game_all_called_turn_to_big_blind_to_call_or_raise():
     return {
         'deck': engine.deck,
-        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'community_cards': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
         'seats': {
             "1": "",
             "2": "",
@@ -416,7 +427,7 @@ def ongoing_game_all_called_turn_to_big_blind_to_call_or_raise():
 def ongoing_game_all_called_turn_to_big_blind_to_check_or_raise():
     return {
         'deck': engine.deck,
-        'flop': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
+        'community_cards': [Card(14, engine.Suit.SPADE), Card(13, engine.Suit.SPADE), Card(12, engine.Suit.SPADE)],
         'seats': {
             "1": "",
             "2": "",
@@ -752,7 +763,7 @@ def ongoing_game_with_three_players_one_waiting(ongoing_game_with_three_players_
 @pytest.fixture
 def game_with_two_players_aligned_p1_to_check_or_raise():
     return {
-        "flop": [],
+        "community_cards": [],
         "seats": {"1": "P1",
                   "2": "P2",
                   "3": ""},
@@ -766,12 +777,6 @@ def game_with_two_players_aligned_p1_to_check_or_raise():
         "dealing": "1",
         "small_blind": 2,
         "big_blind": 2}
-
-
-def test_mock_shuffle_deck():
-    with mock.patch('drunkpoker.main.engine.shuffle_deck') as mock_shuffle:
-        mock_shuffle.return_value = "I have been mocked"
-        assert engine.shuffle_deck() == "I have been mocked"
 
 
 class TestSit:
@@ -1006,7 +1011,7 @@ class TestExcludePlayer:
     def test_exclude_player_game_started_with_two_players(self, ongoing_game_with_two_players):
         event, new_state = engine.exclude_player(ongoing_game_with_two_players, "abcd1234")
         assert event is None
-        assert not new_state["flop"]
+        assert not new_state["community_cards"]
         assert new_state["dealing"] == ""
         assert not "abcd1234" in new_state["players"]
         assert new_state["players"]["other_id"] == {
@@ -1035,9 +1040,13 @@ class TestExcludePlayer:
         assert "abcd1234" not in new_state["players"]
         assert new_state["game_state"] == engine.GameState.GAME_OVER
         assert new_state["results"] == {
-            "winner": "other_other_id",
+            "winners": ["other_other_id"],
             "drinkers": {
                 "other_id": 2
+            },
+            "scores": {
+                "other_id": None,
+                "other_other_id": None
             }
         }
 
@@ -1126,7 +1135,7 @@ class TestStartGame:
                 "cards": list(shuffled_test_deck[2:4])  # Not a conventional way of dealing but w/e
             }
             assert new_state["dealing"] == "3"
-            assert new_state["flop"] == []
+            assert new_state["community_cards"] == []
 
     def test_start_game_4_players_one_dealer(self, iddle_game_with_4_players_and_a_dealer):
         event, new_state = engine.start_game(
@@ -1158,7 +1167,7 @@ class TestStartGame:
         # The game should restart
         event, new_state = engine.start_game(ongoing_game_with_three_players_one_folded)
         assert event is None
-        assert new_state["flop"] == []
+        assert new_state["community_cards"] == []
         assert new_state["game_state"] == engine.GameState.PREFLOP
         assert new_state["dealing"] == "4"
         # No longer comitted
@@ -1218,18 +1227,417 @@ class TestStripStateForPlayer:
         assert "cards" not in new_state["players"]["id2"]
 
 
+class TestRankPlayers:
+
+    def test_rank_players_tie(self, add_player):
+        p1 = add_player("P1", cards=[Card(value=14, suit=Suit.HEART), Card(value=14, suit=Suit.SPADE)])
+        p2 = add_player("P2", cards=[Card(value=14, suit=Suit.CLUBS), Card(value=14, suit=Suit.DIAMONDS)])
+
+        players_ranked = engine.rank_players(
+            {"P1": p1, "P2": p2},
+            [Card(value=13, suit=Suit.HEART),
+             Card(value=13, suit=Suit.SPADE),
+             Card(value=13, suit=Suit.DIAMONDS),
+             Card(value=12, suit=Suit.HEART),
+             Card(value=11, suit=Suit.HEART)]
+        )
+
+        assert players_ranked == [
+            [("P1", (engine.Combinations.FULL_HOUSE, (13, 14))),
+             ("P2", (engine.Combinations.FULL_HOUSE, (13, 14)))]
+        ]
+
+    def test_rank_players_p1_wins(self, add_player):
+        p1 = add_player("P1", cards=[Card(value=14, suit=Suit.HEART), Card(value=14, suit=Suit.SPADE)])
+        p2 = add_player("P1", cards=[Card(value=12, suit=Suit.CLUBS), Card(value=12, suit=Suit.DIAMONDS)])
+
+        players_ranked = engine.rank_players(
+            {"P1": p1, "P2": p2},
+            [Card(value=13, suit=Suit.HEART),
+             Card(value=13, suit=Suit.SPADE),
+             Card(value=13, suit=Suit.DIAMONDS),
+             Card(value=12, suit=Suit.HEART),
+             Card(value=11, suit=Suit.HEART)]
+        )
+
+        assert players_ranked == [
+            [("P1", (engine.Combinations.FULL_HOUSE, (13, 14)))],
+            [("P2", (engine.Combinations.FULL_HOUSE, (13, 12)))]
+        ]
+
+    def test_rank_5_players(self, add_player):
+        p1 = add_player("P1", cards=[Card(value=14, suit=Suit.HEART), Card(value=13, suit=Suit.DIAMONDS)])
+        p2 = add_player("P2", cards=[Card(value=7, suit=Suit.CLUBS), Card(value=8, suit=Suit.CLUBS)])
+        p3 = add_player("P3", cards=[Card(value=10, suit=Suit.CLUBS), Card(value=10, suit=Suit.HEART)])
+        p4 = add_player("P4", cards=[Card(value=7, suit=Suit.SPADE), Card(value=8, suit=Suit.SPADE)])
+        p5 = add_player("P5", cards=[Card(value=2, suit=Suit.CLUBS), Card(value=3, suit=Suit.CLUBS)])
+
+        players_ranked = engine.rank_players(
+            {"P1": p1, "P2": p2, "P3": p3, "P4": p4, "P5": p5},
+            [Card(value=14, suit=Suit.SPADE),
+             Card(value=4, suit=Suit.SPADE),
+             Card(value=5, suit=Suit.SPADE),
+             Card(value=6, suit=Suit.SPADE),
+             Card(value=11, suit=Suit.HEART)]
+        )
+
+        assert players_ranked == [
+            [("P4", (engine.Combinations.STRAIGHT_FLUSH, (8,)))],
+            [("P2", (engine.Combinations.STRAIGHT, (8,)))],
+            [("P5", (engine.Combinations.STRAIGHT, (6,)))],
+            [("P1", (engine.Combinations.ONE_PAIR, (14, 13, 11, 6)))],
+            [("P3", (engine.Combinations.ONE_PAIR, (10, 14, 11, 6)))]
+        ]
+
+
+class TestGetBestCombination:
+    """
+    As I'm not going to write the 81 possible combinations of x vs y, this is assuming transitivity of the
+    "x is a better combination than y" comparison.
+    x=[straight flush, four of a kind, ..., high card]
+    y=[straight flush, four of a kind, ..., high card]
+    """
+
+    def test_straight_flush_against_higher_straight(self):
+        cards = [Card(value=2, suit=Suit.SPADE),
+                 Card(value=3, suit=Suit.SPADE),
+                 Card(value=4, suit=Suit.SPADE),
+                 Card(value=6, suit=Suit.SPADE),
+                 Card(value=7, suit=Suit.HEART),
+                 Card(value=5, suit=Suit.SPADE),
+                 Card(value=8, suit=Suit.CLUBS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.STRAIGHT_FLUSH,
+            best_cards=(6,)
+        )
+
+    def test_straight_against_two_pairs(self):
+        cards = [Card(value=10, suit=Suit.SPADE),
+                 Card(value=11, suit=Suit.SPADE),
+                 Card(value=12, suit=Suit.DIAMONDS),
+                 Card(value=13, suit=Suit.SPADE),
+                 Card(value=13, suit=Suit.CLUBS),
+                 Card(value=14, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.SPADE)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.STRAIGHT,
+            best_cards=(14,)
+        )
+
+    def test_straight_against_lower_straight(self):
+        cards = [Card(value=2, suit=Suit.SPADE),
+                 Card(value=3, suit=Suit.CLUBS),
+                 Card(value=4, suit=Suit.DIAMONDS),
+                 Card(value=5, suit=Suit.SPADE),
+                 Card(value=6, suit=Suit.SPADE),
+                 Card(value=7, suit=Suit.HEART),
+                 Card(value=8, suit=Suit.CLUBS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.STRAIGHT,
+            best_cards=(8,)
+        )
+
+    def test_full_house_against_two_pairs(self):
+        cards = [Card(value=2, suit=Suit.SPADE),
+                 Card(value=2, suit=Suit.CLUBS),
+                 Card(value=2, suit=Suit.DIAMONDS),
+                 Card(value=5, suit=Suit.SPADE),
+                 Card(value=5, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.CLUBS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.FULL_HOUSE,
+            best_cards=(2, 14)
+        )
+
+    def test_two_pairs(self):
+        cards = [Card(value=2, suit=Suit.SPADE),
+                 Card(value=2, suit=Suit.CLUBS),
+                 Card(value=6, suit=Suit.DIAMONDS),
+                 Card(value=5, suit=Suit.SPADE),
+                 Card(value=5, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.CLUBS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.TWO_PAIRS,
+            best_cards=(14, 5, 6)
+        )
+
+    def test_straight_flush_against_four_of_a_kind(self):
+        """
+        Can't happen with 7 cards
+        """
+        assert True
+
+    def test_four_of_a_kind_against_full_house(self):
+        cards = [Card(value=14, suit=Suit.DIAMONDS),
+                 Card(value=14, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.SPADE),
+                 Card(value=14, suit=Suit.HEART),
+                 Card(value=13, suit=Suit.DIAMONDS),
+                 Card(value=13, suit=Suit.HEART),
+                 Card(value=13, suit=Suit.CLUBS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.FOUR_OF_A_KIND,
+            best_cards=(14, 13)
+        )
+
+    def test_full_house_against_flush(self):
+        """
+        Can't happen with 7 cards
+        """
+        assert True
+
+    def test_full_house(self):
+        cards = [Card(value=12, suit=Suit.HEART),
+                 Card(value=12, suit=Suit.CLUBS),
+                 Card(value=14, suit=Suit.DIAMONDS),
+                 Card(value=14, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.SPADE),
+                 Card(value=13, suit=Suit.HEART),
+                 Card(value=13, suit=Suit.DIAMONDS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.FULL_HOUSE,
+            best_cards=(14, 13)
+        )
+
+    def test_flush(self):
+        cards = [Card(value=2, suit=Suit.DIAMONDS),
+                 Card(value=3, suit=Suit.DIAMONDS),
+                 Card(value=6, suit=Suit.SPADE),
+                 Card(value=7, suit=Suit.DIAMONDS),
+                 Card(value=8, suit=Suit.DIAMONDS),
+                 Card(value=9, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.DIAMONDS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.FLUSH,
+            best_cards=(10, 8, 7, 3, 2)
+        )
+
+    def test_flush_against_straight(self):
+        cards = [Card(value=2, suit=Suit.DIAMONDS),
+                 Card(value=3, suit=Suit.DIAMONDS),
+                 Card(value=6, suit=Suit.DIAMONDS),
+                 Card(value=7, suit=Suit.DIAMONDS),
+                 Card(value=8, suit=Suit.DIAMONDS),
+                 Card(value=9, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.DIAMONDS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.FLUSH,
+            best_cards=(10, 8, 7, 6, 3)
+        )
+
+    def test_straight_against_three_of_a_kind(self):
+        cards = [Card(value=10, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.SPADE),
+                 Card(value=6, suit=Suit.DIAMONDS),
+                 Card(value=7, suit=Suit.DIAMONDS),
+                 Card(value=8, suit=Suit.DIAMONDS),
+                 Card(value=9, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.DIAMONDS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.STRAIGHT,
+            best_cards=(10,)
+        )
+
+    def test_three_of_a_kind_against_two_pair(self):
+        """
+        Does not exist, as that would be a full house at least
+        """
+        assert True
+
+    def test_three_of_a_kind_against_one_pair(self):
+        cards = [Card(value=10, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.SPADE),
+                 Card(value=14, suit=Suit.DIAMONDS),
+                 Card(value=13, suit=Suit.CLUBS),
+                 Card(value=8, suit=Suit.DIAMONDS),
+                 Card(value=9, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.DIAMONDS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.THREE_OF_A_KIND,
+            best_cards=(10, 14, 13)
+        )
+
+    def test_two_pairs_against_one_pair(self):
+        cards = [Card(value=2, suit=Suit.HEART),
+                 Card(value=14, suit=Suit.DIAMONDS),
+                 Card(value=2, suit=Suit.SPADE),
+                 Card(value=14, suit=Suit.CLUBS),
+                 Card(value=8, suit=Suit.DIAMONDS),
+                 Card(value=11, suit=Suit.HEART),
+                 Card(value=11, suit=Suit.DIAMONDS)]
+        random.shuffle(cards)
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.TWO_PAIRS,
+            best_cards=(14, 11, 8)
+        )
+
+    def test_pair_against_high_card(self):
+        cards = [Card(value=5, suit=Suit.DIAMONDS),
+                 Card(value=4, suit=Suit.HEART),
+                 Card(value=7, suit=Suit.DIAMONDS),
+                 Card(value=10, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.SPADE),
+                 Card(value=14, suit=Suit.DIAMONDS),
+                 Card(value=12, suit=Suit.CLUBS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.ONE_PAIR,
+            best_cards=(10, 14, 12, 7)
+        )
+
+    def test_high_card(self):
+        cards = [Card(value=9, suit=Suit.HEART),
+                 Card(value=10, suit=Suit.SPADE),
+                 Card(value=13, suit=Suit.DIAMONDS),
+                 Card(value=12, suit=Suit.CLUBS),
+                 Card(value=5, suit=Suit.DIAMONDS),
+                 Card(value=4, suit=Suit.HEART),
+                 Card(value=7, suit=Suit.DIAMONDS)]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.HIGH_CARD,
+            best_cards=(13, 12, 10, 9, 7)
+        )
+
+
+class TestEndGame:
+
+    def test_end_game_two_players_by_fold(self, base_table, add_player):
+        add_player("P1", seat_number="1", state=engine.PlayerState.FOLDED, committed_by=1)
+        add_player("P2", seat_number="2", state=engine.PlayerState.IN_GAME, committed_by=2)
+
+        event, new_state = engine.end_game(base_table)
+
+        assert event is None
+        assert new_state["game_state"] == engine.GameState.GAME_OVER
+        assert new_state["results"] == {
+            "winners": ["P2"],
+            "drinkers": {
+                "P1": 1
+            },
+            "scores": {
+                "P2": None,
+                "P1": None
+            }
+        }
+
+    def test_end_game_big_table_by_fold(self, base_table, add_player):
+        add_player("P1", seat_number="1", state=engine.PlayerState.FOLDED, committed_by=1)
+        add_player("P2", seat_number="2", state=engine.PlayerState.FOLDED, committed_by=4)
+        add_player("P4", seat_number="4", state=engine.PlayerState.IN_GAME, committed_by=10)
+        add_player("P6", seat_number="6", state=engine.PlayerState.FOLDED, committed_by=4)
+        add_player("P8", seat_number="8", state=engine.PlayerState.WAITING_NEW_GAME)
+
+        event, new_state = engine.end_game(base_table)
+
+        assert event is None
+        assert new_state["game_state"] == engine.GameState.GAME_OVER
+        assert new_state["results"] == {
+            "winners": ["P4"],
+            "drinkers": {
+                "P1": 1,
+                "P2": 4,
+                "P6": 4
+            },
+            "scores": {
+                "P1": None,
+                "P2": None,
+                "P4": None,
+                "P6": None
+            }
+        }
+
+    @pytest.mark.parametrize("winners", [["P1"], ["P2"], ["P3"]])
+    def test_end_game_by_end_of_turn_winner_determined_by_rank_players(
+            self, base_table, add_player, winners):
+        p1 = add_player("P1", seat_number="1", committed_by=5)
+        p2 = add_player("P2", seat_number="2", committed_by=5)
+        add_player("P3", seat_number="3", state=engine.PlayerState.WAITING_NEW_GAME)
+        p5 = add_player("P5", seat_number="5", committed_by=5)
+        add_player("P8", seat_number="5", state=engine.PlayerState.FOLDED)
+        base_table["community_cards"] = ["Community_Card1", "Community_Card2", "Community_Card3"]
+
+        with mock.patch('drunkpoker.main.engine.rank_players') as mock_rank_players:
+            mock_rank_players.return_value = [
+                [(winner, "_") for winner in winners],
+            ]
+
+            event, new_state = engine.end_game(base_table)
+
+            assert event is None
+            assert new_state["game_state"] == engine.GameState.GAME_OVER
+            mock_rank_players.assert_called_with(
+                {"P1": p1, "P2": p2, "P5": p5},
+                base_table["community_cards"])
+            assert new_state["results"]["winners"] == winners
+
+    def test_end_game_correct_number_of_sips_and_scores(self, base_table, add_player):
+        add_player("P1", seat_number="1", committed_by=5)
+        add_player("P2", seat_number="2", committed_by=4, state=engine.PlayerState.FOLDED)
+        add_player("P3", seat_number="3", state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P5", seat_number="5", committed_by=5)
+        add_player("P8", seat_number="5", state=engine.PlayerState.FOLDED)
+
+        with mock.patch('drunkpoker.main.engine.rank_players') as mock_rank_players:
+            mock_rank_players.return_value = [
+                [("P1", "scoreP1")],
+                [("P5", "scoreP5")],
+            ]
+
+            event, new_state = engine.end_game(base_table)
+
+            assert event is None
+            assert new_state["game_state"] == engine.GameState.GAME_OVER
+            assert new_state["results"]["drinkers"] == {
+                "P2": 4,
+                "P5": 5
+            }
+            assert new_state["results"]["scores"] == {
+                "P1": "scoreP1",
+                "P5": "scoreP5"
+            }
+
+    def test_end_game_end_to_end_ie_not_mocking_rank_players(self, base_table, add_player):
+        add_player("P1", cards=[Card(value=14, suit=Suit.HEART), Card(value=14, suit=Suit.SPADE)])
+        add_player("P2", cards=[Card(value=14, suit=Suit.CLUBS), Card(value=14, suit=Suit.DIAMONDS)])
+        base_table["community_cards"] =\
+            [Card(value=13, suit=Suit.HEART),
+             Card(value=13, suit=Suit.SPADE),
+             Card(value=13, suit=Suit.DIAMONDS),
+             Card(value=12, suit=Suit.HEART),
+             Card(value=11, suit=Suit.HEART)]
+
+        event, new_state = engine.end_game(base_table)
+
+        assert event is None
+        assert new_state["game_state"] == engine.GameState.GAME_OVER
+        assert new_state["results"]["winners"] == ["P1", "P2"]
+        assert new_state["results"]["scores"] == {
+            "P1": (engine.Combinations.FULL_HOUSE, (13, 14)),
+            "P2": (engine.Combinations.FULL_HOUSE, (13, 14))
+        }
+
+
 class TestFold:
 
     def test_fold_2_players_her_turn(self, ongoing_game_with_two_players):
         event, new_state = engine.fold_player(ongoing_game_with_two_players, "abcd1234")
-        assert new_state["game_state"] == engine.GameState.GAME_OVER
-        assert new_state["results"] == {
-            "winner": "other_id",
-            "drinkers": {
-                "abcd1234": 1
-            }
-        }
-        assert event is None
+        assert new_state["players"]["abcd1234"]["state"] == engine.PlayerState.FOLDED
+        assert event == engine.Event.make_event(engine.Event.END_GAME)
 
     def test_fold_3_players(self, ongoing_game_with_three_players_all_in_game):
         previous_game_state = ongoing_game_with_three_players_all_in_game["game_state"]
@@ -1287,16 +1695,8 @@ class TestFold:
             ongoing_game_all_folded,
             "P2"
         )
-        assert event is None
-        assert new_state["game_state"] == engine.GameState.GAME_OVER
-        assert new_state["results"] == {
-            "winner": "P3",
-            "drinkers": {
-                "P1": 1,
-                "P2": 4,
-                "P5": 4
-            }
-        }
+        assert event == engine.Event.make_event(engine.Event.END_GAME)
+        assert new_state["players"]["P2"]["state"] == engine.PlayerState.FOLDED
 
     def test_fold_next_step_big_table(self, ongoing_game_partially_called_partially_folded_last_call):
         event, new_state = engine.fold_player(
@@ -1416,24 +1816,27 @@ class TestCheckOrCallOrFold:
         with pytest.raises(engine.EventRejected):
             _ = action(state, "played_id")
 
-    @pytest.mark.parametrize("game_state", [
-        (engine.GameState.GAME_OVER,),
-        (engine.GameState.NOT_STARTED,)
-    ])
-    def test_check_game_not_ongoing(self, action, game_state):
-        state = {"game_state": game_state}
-        with pytest.raises(engine.EventRejected):
-            _ = action(state, "player_id")
-
     @pytest.mark.parametrize("player_state", [
         (engine.PlayerState.WAITING_NEW_GAME,),
         (engine.PlayerState.FOLDED,),
         (engine.PlayerState.IN_GAME,)
     ])
-    def test_check_not_her_turn(self, action, player_state):
+    def test_not_her_turn(self, action, player_state):
         state = {"game_state": engine.GameState.FLOP, "players": {"p1": {"state": player_state}}}
         with pytest.raises(engine.EventRejected):
             _ = action(state, "p1")
+
+    def test_last_player_of_last_turn(self, action, base_table, add_player, game_state_turn):
+        add_player("P1", seat_number=1, committed_by=3)
+        add_player("P8", seat_number=8, committed_by=3, state=engine.PlayerState.MY_TURN)
+        base_table["dealing"] = 1
+
+        event, state = action(
+            base_table,
+            "P8"
+        )
+
+        assert event == engine.Event.make_event(engine.Event.END_GAME)
 
 
 class TestCheck:
@@ -1605,13 +2008,13 @@ class TestCall:
 
 
 @pytest.mark.parametrize(
-    "action, number_of_cards, cards_already_there",
-    [(engine.draw_flop, 3, []),
-     (engine.draw_river, 1, ["c1", "c2", "c3"]),
-     (engine.draw_turn, 1, ["c1", "c2", "c3", "c4"])])
+    "action, number_of_cards, cards_already_there, next_state",
+    [(engine.draw_flop, 3, [], engine.GameState.FLOP),
+     (engine.draw_river, 1, ["c1", "c2", "c3"], engine.GameState.RIVER),
+     (engine.draw_turn, 1, ["c1", "c2", "c3", "c4"], engine.GameState.TURN)])
 class TestDrawFlopRiverOrTurn:
 
-    def test_draw_flop_no_deck(self, action, number_of_cards, cards_already_there):
+    def test_no_deck(self, action, number_of_cards, cards_already_there, next_state):
         the_state = {}
         with pytest.raises(engine.EventRejected):
             _ = action(the_state)
@@ -1622,21 +2025,30 @@ class TestDrawFlopRiverOrTurn:
         with pytest.raises(engine.EventRejected):
             _ = action(the_state)
 
-    def test_draw_flop_no_next_player(self, action, base_table, add_player, number_of_cards, cards_already_there):
+    def test_no_next_player(
+            self, action, base_table, add_player, number_of_cards, cards_already_there,
+            next_state
+    ):
         add_player("P1", seat_number=1, state=engine.PlayerState.FOLDED)
         with pytest.raises(engine.EventRejected):
             _ = action(base_table)
 
-    def test_draw_flop_overrides_state(self, action, base_table, add_player, number_of_cards, cards_already_there):
+    def test_overrides_state(
+            self, action, base_table, add_player, number_of_cards, cards_already_there,
+            next_state
+    ):
         add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
         add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.GAME_OVER
         event, new_state = action(base_table)
 
         assert event is None
-        assert new_state["game_state"] == engine.GameState.FLOP
+        assert new_state["game_state"] == next_state
 
-    def test_draw_flop_no_dealer_set(self, action, base_table, add_player, number_of_cards, cards_already_there):
+    def test_no_dealer_set(
+            self, action, base_table, add_player, number_of_cards, cards_already_there,
+            next_state
+    ):
         """
         If that's the case assume P1 is the dealer
         """
@@ -1649,21 +2061,22 @@ class TestDrawFlopRiverOrTurn:
         assert base_table["dealing"] == "1"
         assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
         assert new_state["players"]["P2"]["state"] == engine.PlayerState.IN_GAME
-        assert new_state["game_state"] == engine.GameState.FLOP
+        assert new_state["game_state"] == next_state
 
-    def test_draw_flop_determines_next_player(
+    def test_determines_next_player(
             self,
             action,
             base_table,
             add_player,
             cards_already_there,
-            number_of_cards
+            number_of_cards,
+            next_state
     ):
         add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
         add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.PREFLOP
-        base_table["flop"] = cards_already_there
+        base_table["community_cards"] = cards_already_there
         base_table["dealing"] = "1"
 
         flop = cards_already_there + base_table["deck"][0:number_of_cards]
@@ -1674,10 +2087,13 @@ class TestDrawFlopRiverOrTurn:
         assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
         for player_id in ["P2", "P3"]:
             assert new_state["players"][player_id]["state"] == engine.PlayerState.IN_GAME
-        assert new_state["flop"] == flop
-        assert new_state["game_state"] == engine.GameState.FLOP
+        assert new_state["community_cards"] == flop
+        assert new_state["game_state"] == next_state
 
-    def test_draw_flop_dealer_folded(self, action, base_table, add_player, number_of_cards, cards_already_there):
+    def test_dealer_folded(
+            self, action, base_table, add_player, number_of_cards, cards_already_there,
+            next_state
+    ):
         add_player("P1", seat_number=1, state=engine.PlayerState.FOLDED)
         add_player("P2", seat_number=2, state=engine.PlayerState.IN_GAME)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
@@ -1688,7 +2104,10 @@ class TestDrawFlopRiverOrTurn:
         assert event is None
         assert new_state["players"]["P2"]["state"] == engine.PlayerState.MY_TURN
 
-    def test_draw_flop_no_dealer(self, action, base_table, add_player, number_of_cards, cards_already_there):
+    def test_no_dealer(
+            self, action, base_table, add_player, number_of_cards, cards_already_there,
+            next_state
+    ):
         add_player("P2", seat_number=2, state=engine.PlayerState.FOLDED)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
         add_player("P4", seat_number=4, state=engine.PlayerState.IN_GAME)
@@ -1699,7 +2118,10 @@ class TestDrawFlopRiverOrTurn:
         assert event is None
         assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
 
-    def test_draw_flop_two_players(self, action, base_table, add_player, number_of_cards, cards_already_there):
+    def test_two_players(
+            self, action, base_table, add_player, number_of_cards, cards_already_there,
+            next_state
+    ):
         add_player("P2", seat_number=2, state=engine.PlayerState.FOLDED)
         add_player("P3", seat_number=3, state=engine.PlayerState.IN_GAME)
         base_table["game_state"] = engine.GameState.PREFLOP
@@ -1714,9 +2136,9 @@ class TestDrawFlopRiverOrTurn:
         [("1", "P1"), ("2", "P6"), ("3", "P6"), ("4", "P6"),
          ("5", "P6"), ("6", "P6"), ("7", "P1"), ("8", "P1")]
     )
-    def test_draw_flop_big_table_with_holes(
+    def test_big_table_with_holes(
             self, action, dealer, expected_new_player, base_table, add_player,
-            number_of_cards, cards_already_there):
+            number_of_cards, cards_already_there, next_state):
         add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
         add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
         add_player("P5", seat_number=5, state=engine.PlayerState.WAITING_NEW_GAME)
@@ -1731,4 +2153,117 @@ class TestDrawFlopRiverOrTurn:
         assert new_state["players"]["P4"]["state"] == engine.PlayerState.FOLDED
         assert new_state["players"]["P5"]["state"] == engine.PlayerState.WAITING_NEW_GAME
         assert new_state["players"]["P8"]["state"] == engine.PlayerState.FOLDED
-        assert new_state["game_state"] == engine.GameState.FLOP
+        assert new_state["game_state"] == next_state
+
+
+class TestRaise:
+
+    def test_raise_not_her_turn(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P6", seat_number=6, state=engine.PlayerState.MY_TURN)
+
+        with pytest.raises(engine.EventRejected):
+            engine.player_raise(
+                base_table,
+                "P1",
+                10
+            )
+
+    def test_raise_unknown(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
+        add_player("P6", seat_number=6, state=engine.PlayerState.MY_TURN)
+
+        with pytest.raises(engine.EventRejected):
+            engine.player_raise(
+                base_table,
+                "Unknown",
+                10
+            )
+
+    def test_raise_over_limit(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P6", seat_number=6, state=engine.PlayerState.MY_TURN)
+        base_table["all_in"] = 20
+
+        with pytest.raises(engine.EventRejected):
+            engine.player_raise(
+                base_table,
+                "P6",
+                21
+            )
+
+    def test_raise_by_less_than_committed_by(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P6", seat_number=6, committed_by=5, state=engine.PlayerState.MY_TURN)
+
+        with pytest.raises(engine.EventRejected):
+            engine.player_raise(
+                base_table,
+                "P6",
+                4
+            )
+
+    def test_raise_by_less_max_bet(self, base_table, add_player):
+        add_player("P1", seat_number=1, committed_by=6, state=engine.PlayerState.IN_GAME)
+        add_player("P6", seat_number=6, committed_by=2, state=engine.PlayerState.MY_TURN)
+
+        with pytest.raises(engine.EventRejected):
+            engine.player_raise(
+                base_table,
+                "P6",
+                4
+            )
+
+    def test_raise_updates_the_committed_by_amount(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P6", seat_number=6, committed_by=2, state=engine.PlayerState.MY_TURN)
+
+        event, new_state = engine.player_raise(
+            base_table,
+            "P6",
+            4
+        )
+
+        assert event is None
+        assert new_state["players"]["P6"]["committed_by"] == 4
+
+    def test_raise_turn_to_big_blind_goes_round(self, base_table, add_player):
+        add_player("P1", seat_number=1, state=engine.PlayerState.IN_GAME)
+        add_player("P6", seat_number=6, committed_by=1, state=engine.PlayerState.MY_TURN)
+
+        event, new_state = engine.player_raise(
+            base_table,
+            "P6",
+            10
+        )
+
+        assert event is None
+        assert new_state["players"]["P6"]["state"] == engine.PlayerState.IN_GAME
+        assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
+
+    @pytest.mark.parametrize(
+        "turn_to, next_to_play",
+        [("P1", "P2"), ("P2", "P6"), ("P6", "P1")]
+    )
+    def test_raise_passes_hand_to_correct_player(self, base_table, add_player, turn_to, next_to_play):
+
+        def make_state(player_id):
+            return engine.PlayerState.MY_TURN if player_id == turn_to else engine.PlayerState.IN_GAME
+
+        add_player("P1", seat_number=1, state=make_state("P1"))
+        add_player("P2", seat_number=2, committed_by=4, state=make_state("P2"))
+        add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
+        add_player("P5", seat_number=5, state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P6", seat_number=6, committed_by=1, state=make_state("P6"))
+        add_player("P8", seat_number=8, state=engine.PlayerState.FOLDED)
+
+        event, new_state = engine.player_raise(
+            base_table,
+            turn_to,
+            10
+        )
+
+        assert event is None
+        assert new_state["players"][turn_to]["state"] == engine.PlayerState.IN_GAME
+        assert new_state["players"][next_to_play]["state"] == engine.PlayerState.MY_TURN

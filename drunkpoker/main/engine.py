@@ -2,6 +2,7 @@
 from enum import Enum, auto
 from collections import namedtuple
 from random import shuffle
+from itertools import groupby
 
 
 class EventRejected(Exception):
@@ -57,6 +58,25 @@ class MessageType:
     DRINK = "DRINK"
 
 
+class Combinations:
+    HIGH_CARD = 0
+    ONE_PAIR = 1
+    TWO_PAIRS = 2
+    THREE_OF_A_KIND = 3
+    STRAIGHT = 4
+    FLUSH = 5
+    FULL_HOUSE = 6
+    FOUR_OF_A_KIND = 7
+    STRAIGHT_FLUSH = 8
+
+
+"""
+Probably don't want to change that as the python natural tuple comparison is used. Combination is a number and 
+best_cards a tuple of numbers
+"""
+Result = namedtuple("Result", "combination best_cards")
+
+
 Card = namedtuple("Card", "value suit")
 
 card_values = range(2, 15)  # J = 11, Q = 12, K = 13, As = 14 for sorting reasons
@@ -82,7 +102,7 @@ def initial_state():
     """
     return {
         'deck': shuffle_deck(),
-        'flop': [],
+        'community_cards': [],
         'seats': {
             "1": "",
             "2": "",
@@ -99,8 +119,9 @@ def initial_state():
         'players': {},
         'game_state': GameState.NOT_STARTED,
         'dealing': '',
-        'small_blind': 2,
-        'big_blind': 2
+        'small_blind': 1,
+        'big_blind': 2,
+        'all_in': 20
     }
 
 
@@ -118,6 +139,8 @@ class Event(Enum):
     FOLD = auto()
     CHECK = auto()
     CALL = auto()
+    RAISE = auto()
+    END_GAME = auto()
     NONE = auto()
     DRAW_FLOP = auto()
     DRAW_RIVER = auto()
@@ -179,7 +202,7 @@ def start_game(state):
         state["players"][player_id]["state"] = PlayerState.IN_GAME
         state["players"][player_id]["committed_by"] = 0
 
-    state["flop"] = []
+    state["community_cards"] = []
 
     state["dealing"] = determine_next_dealer_seat(state)
     state["deck"] = shuffle_deck()
@@ -244,7 +267,7 @@ def exclude_player(state, the_player_id):
         # Only one playing player left that's not waiting for new game, game ends
         state["dealing"] = ""
         state["game_state"] = GameState.NOT_STARTED
-        state["flop"] = []
+        state["community_cards"] = []
         for player_id in state["players"]:
             state["players"][player_id] = {
                 "state": PlayerState.WAITING_NEW_GAME,
@@ -312,7 +335,7 @@ def get_max_bet(state):
         player["committed_by"]
         for player in state["players"].values()
         if "committed_by" in player
-    ])
+    ] + [0])
 
 
 def next_state_event(game_state):
@@ -324,6 +347,8 @@ def next_state_event(game_state):
             return Event.DRAW_RIVER
         elif game_state == GameState.RIVER:
             return Event.DRAW_TURN
+        elif game_state == GameState.TURN:
+            return Event.END_GAME
         else:
             print(f"No event for game state: {game_state}")
             return None
@@ -360,27 +385,96 @@ def determine_next_players_for_this_round(state, current_player_id):
         player_id_
         for player_id_ in players_before_current
         if (state["players"][player_id_]["state"] == PlayerState.IN_GAME
-            and state["players"][player_id_]["committed_by"] < max_bet)
+            and (
+                state["players"][player_id_]["committed_by"] if "committed_by" in state["players"][player_id_] else 0
+            ) < max_bet)
     ]
 
     return players_after_current_not_folded, players_before_current_not_folded_not_aligned
 
 
+def rank_players(players, community_cards):
+
+    def key(player_id_combination_tuple):
+        return player_id_combination_tuple[1]
+
+    return [
+        list(players)
+        for _, players in groupby(
+            sorted(
+                [
+                    (player_id, best_combination(players[player_id]["cards"] + community_cards))
+                    for player_id in players
+                ],
+                key=key,
+                reverse=True
+            ),
+            key=key
+        )
+    ]
+
+
 def generate_end_game_results(state):
-    return {
-        "winner": find_player_ids_if(
-            state["players"],
-            lambda player: PlayerState.is_in_game(player["state"]) and player["state"] != PlayerState.FOLDED
-        )[0],
-        "drinkers": {
-            player_id: state["players"][player_id]["committed_by"]
-            for player_id in find_player_ids_if(
+    # By fold
+    if all_folded_but_one(state["players"]):
+        return {
+            "winners": find_player_ids_if(
                 state["players"],
-                lambda player: player["state"] == PlayerState.FOLDED
-            )
-            if "committed_by" in state["players"][player_id]
+                lambda player: PlayerState.is_in_game(player["state"]) and player["state"] != PlayerState.FOLDED
+            ),
+            "drinkers": {
+                player_id: state["players"][player_id]["committed_by"]
+                for player_id in find_player_ids_if(
+                    state["players"],
+                    lambda player: player["state"] == PlayerState.FOLDED
+                )
+                if "committed_by" in state["players"][player_id]
+            },
+            "scores": {
+                player_id: None
+                for player_id in find_player_ids_if(
+                    state["players"],
+                    lambda player: PlayerState.is_in_game(player["state"])
+                )
+            }
         }
-    }
+    # By end of turn round
+    else:
+        # Looks like:
+        # [
+        #   [(P1, score), (P2, score)]
+        #   [(P3, score)]
+        #   ...
+        # ]
+        players_ranked_with_score = rank_players(
+            {
+                player_id: player
+                for player_id, player in state["players"].items()
+                if PlayerState.could_play(player["state"])
+            },
+            state["community_cards"]
+        )
+        winners_ids = [player_score[0] for player_score in players_ranked_with_score[0]]
+        folded_player_ids = find_player_ids_if(state["players"], lambda player: player["state"] == PlayerState.FOLDED)
+        losers_ids = folded_player_ids + [
+            looser_and_score[0]
+            for list_of_losers_scores in players_ranked_with_score[1:]
+            for looser_and_score in list_of_losers_scores
+        ]
+        scores = {
+            looser_and_score[0]: looser_and_score[1]
+            for list_of_losers_scores in players_ranked_with_score
+            for looser_and_score in list_of_losers_scores
+        }
+        return {
+            "winners": winners_ids,
+            "drinkers": {
+                loser_id: state["players"][loser_id]["committed_by"]
+                for loser_id in losers_ids
+                if "committed_by" in state["players"][loser_id]
+            },
+            "scores": scores
+        }
 
 
 def fold_player(state, player_id):
@@ -400,8 +494,7 @@ def fold_player(state, player_id):
         # Either game ends if we're at the turn or all folded but one
         if (state["game_state"] == GameState.TURN
                 or all_folded_but_one(state["players"])):
-            state["results"] = generate_end_game_results(state)
-            state["game_state"] = GameState.GAME_OVER
+            event = Event.make_event(Event.END_GAME)
         # Or draw next state
         else:
             event = next_state_event(state["game_state"])
@@ -446,7 +539,7 @@ def player_check(state, player_id):
     return event, state
 
 
-def draw_x(state, number_of_cards):
+def draw_x(state, number_of_cards, next_state):
     if "deck" not in state or not state["deck"] or len(state["deck"]) < number_of_cards:
         raise EventRejected("Not deck, can't draw flop")
 
@@ -463,22 +556,22 @@ def draw_x(state, number_of_cards):
 
     next_player_id = in_game_players_starting_at_dealer[0]
     state["players"][next_player_id]["state"] = PlayerState.MY_TURN
-    state["game_state"] = GameState.FLOP
-    state["flop"] = state["flop"] + [state["deck"].pop(0) for _ in range(0, number_of_cards)]
+    state["game_state"] = next_state
+    state["community_cards"] = state["community_cards"] + [state["deck"].pop(0) for _ in range(0, number_of_cards)]
 
     return None, state
 
 
 def draw_flop(state):
-    return draw_x(state, 3)
+    return draw_x(state, 3, GameState.FLOP)
 
 
 def draw_river(state):
-    return draw_x(state, 1)
+    return draw_x(state, 1, GameState.RIVER)
 
 
 def draw_turn(state):
-    return draw_x(state, 1)
+    return draw_x(state, 1, GameState.TURN)
 
 
 def player_call(state, player_id):
@@ -503,6 +596,192 @@ def player_call(state, player_id):
         event = next_state_event(state["game_state"])
 
     return event, state
+
+
+def best_combination(cards):
+
+    def get_sequences_in_len_reversed_order(
+            ordered_cards,
+            are_following_each_other,
+            skip_if=lambda card1, card2: False
+    ):
+        sequences = [[ordered_cards[0]]]
+        for card in ordered_cards[1:]:
+            if are_following_each_other(sequences[-1][-1], card):
+                sequences[-1].append(card)
+            elif skip_if(sequences[-1][-1], card):
+                pass
+            else:
+                sequences.append([card])
+        return sorted(sequences, key=lambda seq: len(seq), reverse=True)
+
+    def get_longest_sequence(ordered_cards, are_following_each_other, skip_if=lambda card1, card2: False):
+        sequences = get_sequences_in_len_reversed_order(ordered_cards, are_following_each_other, skip_if=skip_if)
+        return sequences[0]
+
+    def check_straight_flush(ordered_cards):
+        longest_straight_flush_sequence = get_longest_sequence(
+            ordered_cards,
+            lambda card1, card2: card1.value == card2.value + 1 and card1.suit == card2.suit
+        )
+        if len(longest_straight_flush_sequence) >= 5:
+            return Result(
+                Combinations.STRAIGHT_FLUSH,
+                (max([card.value for card in longest_straight_flush_sequence]),)
+            )
+
+    def check_four_of_a_kind(ordered_cards):
+        longest_same_value_sequence = get_longest_sequence(
+            ordered_cards,
+            lambda card1, card2: card1.value == card2.value
+        )
+        if len(longest_same_value_sequence) == 4:
+            value = longest_same_value_sequence[0].value
+            return Result(
+                Combinations.FOUR_OF_A_KIND,
+                (value,
+                 max({card.value for card in ordered_cards} - {value}))
+            )
+
+    def check_full_house(ordered_cards):
+        same_card_sequences = get_sequences_in_len_reversed_order(
+            ordered_cards,
+            lambda card1, card2: card1.value == card2.value
+        )
+        if len(same_card_sequences[0]) == 3 and len(same_card_sequences[1]) >= 2:
+            return Result(
+                Combinations.FULL_HOUSE,
+                (same_card_sequences[0][0].value, same_card_sequences[1][0].value)
+            )
+
+    def check_flush(ordered_cards):
+        longest_same_suit_sequence = get_longest_sequence(
+            sorted(ordered_cards, key=lambda card: card.suit),
+            lambda card1, card2: card1.suit == card2.suit
+        )
+        if len(longest_same_suit_sequence) >= 5:
+            return Result(
+                Combinations.FLUSH,
+                tuple([card.value for card in longest_same_suit_sequence][0:5])
+            )
+
+    def check_straight(ordered_cards):
+        longest_sequence = get_longest_sequence(
+            ordered_cards,
+            lambda card1, card2: card1.value == card2.value + 1,
+            skip_if=lambda card1, card2: card1.value == card2.value
+        )
+        if len(longest_sequence) >= 5:
+            return Result(
+                Combinations.STRAIGHT,
+                (longest_sequence[0].value,)
+            )
+
+    def check_three_of_a_kind(ordered_cards):
+        longest_same_card_sequence = get_longest_sequence(
+            ordered_cards,
+            lambda card1, card2: card1.value == card2.value
+        )
+        if len(longest_same_card_sequence) == 3:
+            value_of_triplet = longest_same_card_sequence[0].value
+            return Result(
+                Combinations.THREE_OF_A_KIND,
+                (longest_same_card_sequence[0].value,) +
+                tuple(sorted(list(
+                    {card.value for card in ordered_cards} - {value_of_triplet}
+                ), reverse=True)[0:2])
+            )
+
+    def check_two_pairs(ordered_cards):
+        longest_same_card_sequences = get_sequences_in_len_reversed_order(
+            ordered_cards,
+            lambda card1, card2: card1.value == card2.value
+        )
+        two_cards_sequences_in_reverse_value_order = sorted(
+            filter(lambda seq: len(seq) == 2, longest_same_card_sequences),
+            key=lambda seq: seq[0].value,
+            reverse=True
+        )
+        if len(two_cards_sequences_in_reverse_value_order) >= 2:
+            highest_pair_value = two_cards_sequences_in_reverse_value_order[0][0].value
+            second_highest_pair_value = two_cards_sequences_in_reverse_value_order[1][0].value
+            all_values = {card.value for card in ordered_cards}
+            return Result(
+                Combinations.TWO_PAIRS,
+                (
+                    highest_pair_value,
+                    second_highest_pair_value,
+                    max(all_values - {highest_pair_value, second_highest_pair_value})
+                )
+            )
+
+    def check_one_pair(ordered_cards):
+        longest_same_card_sequences = get_sequences_in_len_reversed_order(
+            ordered_cards,
+            lambda card1, card2: card1.value == card2.value
+        )
+        if len(longest_same_card_sequences[0]) == 2:
+            pair_value = longest_same_card_sequences[0][0].value
+            three_best_single_card_values = tuple(sorted(
+                {card.value for card in ordered_cards} - {pair_value},
+                reverse=True
+            )[0:3])
+            return Result(
+                Combinations.ONE_PAIR,
+                (pair_value,) + three_best_single_card_values
+            )
+
+    cards_in_order = sorted(cards, reverse=True)
+
+    for check_combination in [
+        check_straight_flush,
+        check_four_of_a_kind,
+        check_full_house,
+        check_flush,
+        check_straight,
+        check_three_of_a_kind,
+        check_two_pairs,
+        check_one_pair
+    ]:
+        combination = check_combination(cards_in_order)
+        if combination:
+            return combination
+
+    return Result(
+        Combinations.HIGH_CARD,
+        tuple(sorted([card.value for card in cards_in_order], reverse=True)[0:5])
+    )
+
+
+def end_game(state):
+    state["game_state"] = GameState.GAME_OVER
+    state["results"] = generate_end_game_results(state)
+    return None, state
+
+
+def player_raise(state, player_id, amount):
+    if player_id not in state["players"]:
+        raise EventRejected(f"Unknown player {player_id} trying to raise")
+    elif state["players"][player_id]["state"] != PlayerState.MY_TURN:
+        raise EventRejected(f"Player {player_id} trying to raise while not their turn")
+    elif amount < get_max_bet(state):
+        raise EventRejected(f"Player {player_id} trying to raise under max bet")
+    elif amount > state["all_in"]:
+        raise EventRejected(f"Player {player_id} trying to raise over limit")
+
+    state["players"][player_id]["committed_by"] = amount
+
+    (players_after_current_not_folded,
+     players_before_current_not_folded_not_aligned) = determine_next_players_for_this_round(state, player_id)
+
+    state["players"][player_id]["state"] = PlayerState.IN_GAME
+    next_player_id = (
+        players_after_current_not_folded[0] if players_after_current_not_folded
+        else players_before_current_not_folded_not_aligned[0]
+    )
+    state["players"][next_player_id]["state"] = PlayerState.MY_TURN
+
+    return None, state
 
 
 def process_event(state, event):
@@ -547,6 +826,14 @@ def process_event(state, event):
             state,
             event["player_id"]
         )
+    elif event["type"] == Event.RAISE:
+        event, new_state = player_raise(
+            state,
+            event["player_id"],
+            event["parameters"]["amount"],
+        )
+    elif event["type"] == Event.END_GAME:
+        event, new_state = end_game(state)
     else:
         print(f"WARNING: unknown event type: {event['type']}")
         event, new_state = None, state
