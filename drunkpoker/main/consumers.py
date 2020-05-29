@@ -67,7 +67,8 @@ class PlayerActions(AsyncHttpConsumer):
         "nextGame": engine.Event.PLAYER_READY_FOR_NEXT_GAME,
         "check": engine.Event.CHECK,
         "call": engine.Event.CALL,
-        "raise": engine.Event.RAISE
+        "raise": engine.Event.RAISE,
+        "showCards": engine.Event.SHOW_CARDS
     }
 
     def event_type(self):

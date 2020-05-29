@@ -76,7 +76,6 @@ best_cards a tuple of numbers
 """
 Result = namedtuple("Result", "combination best_cards")
 
-
 Card = namedtuple("Card", "value suit")
 
 card_values = range(2, 15)  # J = 11, Q = 12, K = 13, As = 14 for sorting reasons
@@ -141,6 +140,7 @@ class Event(Enum):
     CALL = auto()
     RAISE = auto()
     END_GAME = auto()
+    SHOW_CARDS = auto()
     NONE = auto()
     DRAW_FLOP = auto()
     DRAW_RIVER = auto()
@@ -162,9 +162,26 @@ def is_table_empty(state):
 def strip_state_for_player(state, player_id):
     if "deck" in state:
         del state["deck"]
+    game_over = state["game_state"] == GameState.GAME_OVER
+    should_show_cards_because_end_of_game = (
+            not all_folded_but_one(state["players"])
+            and game_over
+    )
+
+    def player_shows_cards(player_id_):
+        return ("show_cards" in state["players"][a_player_id]
+                and state["players"][a_player_id]["show_cards"])
+
     for a_player_id in state["players"]:
         if player_id != a_player_id:
-            if "cards" in state["players"][a_player_id]:
+            should_show_cards_anyway = (
+                    (should_show_cards_because_end_of_game
+                     and (PlayerState.could_play(state["players"][a_player_id]["state"])
+                          or player_shows_cards(a_player_id)))
+                    or game_over and player_shows_cards(a_player_id)
+            )
+
+            if "cards" in state["players"][a_player_id] and not should_show_cards_anyway:
                 del state["players"][a_player_id]["cards"]
     return state
 
@@ -187,7 +204,7 @@ def determine_next_dealer_seat(state):
 
 def validate_check_or_call_or_fold(state, player_id):
     if not GameState.is_ongoing(state["game_state"]):
-        raise EventRejected("Player check when game is not ongoing")
+        raise EventRejected("Player check or call or fold when game is not ongoing")
     if player_id not in state["players"]:
         raise EventRejected(f"Player {player_id} is unknown")
     if state["players"][player_id]["state"] != PlayerState.MY_TURN:
@@ -201,6 +218,8 @@ def start_game(state):
     for player_id in state["players"]:
         state["players"][player_id]["state"] = PlayerState.IN_GAME
         state["players"][player_id]["committed_by"] = 0
+        if "show_cards" in state["players"][player_id]:
+            del state["players"][player_id]["show_cards"]
 
     state["community_cards"] = []
 
@@ -330,16 +349,24 @@ def all_folded_but_one(players):
     return in_game_count - folded_count == 1
 
 
+def all_players_all_in(state):
+    return all([
+        (True if ("committed_by" in player and player["committed_by"] == state["all_in"])
+                 or not PlayerState.could_play(player["state"])
+         else False)
+        for player in state["players"].values()
+    ])
+
+
 def get_max_bet(state):
     return max([
-        player["committed_by"]
-        for player in state["players"].values()
-        if "committed_by" in player
-    ] + [0])
+                   player["committed_by"]
+                   for player in state["players"].values()
+                   if "committed_by" in player
+               ] + [0])
 
 
 def next_state_event(game_state):
-
     def event_type():
         if game_state == GameState.PREFLOP:
             return Event.DRAW_FLOP
@@ -394,7 +421,6 @@ def determine_next_players_for_this_round(state, current_player_id):
 
 
 def rank_players(players, community_cards):
-
     def key(player_id_combination_tuple):
         return player_id_combination_tuple[1]
 
@@ -425,17 +451,17 @@ def generate_end_game_results(state):
             "drinkers": {
                 player_id: state["players"][player_id]["committed_by"]
                 for player_id in find_player_ids_if(
-                    state["players"],
-                    lambda player: player["state"] == PlayerState.FOLDED
-                )
+                state["players"],
+                lambda player: player["state"] == PlayerState.FOLDED
+            )
                 if "committed_by" in state["players"][player_id]
             },
             "scores": {
                 player_id: None
                 for player_id in find_player_ids_if(
-                    state["players"],
-                    lambda player: PlayerState.is_in_game(player["state"])
-                )
+                state["players"],
+                lambda player: PlayerState.is_in_game(player["state"])
+            )
             }
         }
     # By end of turn round
@@ -478,7 +504,6 @@ def generate_end_game_results(state):
 
 
 def fold_player(state, player_id):
-
     validate_check_or_call_or_fold(state, player_id)
 
     (players_after_current_not_folded,
@@ -520,7 +545,6 @@ def player_ready(state, player_id):
 
 
 def player_check(state, player_id):
-
     validate_check_or_call_or_fold(state, player_id)
 
     current_player = state["players"][player_id]
@@ -559,7 +583,12 @@ def draw_x(state, number_of_cards, next_state):
     state["game_state"] = next_state
     state["community_cards"] = state["community_cards"] + [state["deck"].pop(0) for _ in range(0, number_of_cards)]
 
-    return None, state
+    event = None
+    if all_players_all_in(state):
+        state["players"][next_player_id]["state"] = PlayerState.IN_GAME
+        event = next_state_event(next_state)
+
+    return event, state
 
 
 def draw_flop(state):
@@ -575,7 +604,6 @@ def draw_turn(state):
 
 
 def player_call(state, player_id):
-
     validate_check_or_call_or_fold(state, player_id)
 
     current_player = state["players"][player_id]
@@ -588,7 +616,9 @@ def player_call(state, player_id):
 
     state["players"][player_id]["state"] = PlayerState.IN_GAME
     event = None
-    if players_after_current_not_folded:
+    if all_players_all_in(state):
+        event = next_state_event(state["game_state"])
+    elif players_after_current_not_folded:
         state["players"][players_after_current_not_folded[0]]["state"] = PlayerState.MY_TURN
     elif players_before_current_not_folded_not_aligned:
         state["players"][players_before_current_not_folded_not_aligned[0]]["state"] = PlayerState.MY_TURN
@@ -599,7 +629,6 @@ def player_call(state, player_id):
 
 
 def best_combination(cards):
-
     def get_sequences_in_len_reversed_order(
             ordered_cards,
             are_following_each_other,
@@ -731,7 +760,7 @@ def best_combination(cards):
                 (pair_value,) + three_best_single_card_values
             )
 
-    cards_in_order = sorted(cards, reverse=True)
+    cards_in_order = sorted([Card(*card) for card in cards], reverse=True)
 
     for check_combination in [
         check_straight_flush,
@@ -784,8 +813,14 @@ def player_raise(state, player_id, amount):
     return None, state
 
 
-def process_event(state, event):
+def show_cards(state, player_id):
+    if player_id not in state["players"]:
+        raise EventRejected(f"Trying to show cards for player {player_id}, who's not in the game")
+    state["players"][player_id]["show_cards"] = True
+    return None, state
 
+
+def process_event(state, event):
     if event["type"] == Event.PLAYER_SIT:
         event, new_state = sit_player(
             state,
@@ -834,6 +869,11 @@ def process_event(state, event):
         )
     elif event["type"] == Event.END_GAME:
         event, new_state = end_game(state)
+    elif event["type"] == Event.SHOW_CARDS:
+        event, new_state = show_cards(
+            state,
+            event["player_id"]
+        )
     else:
         print(f"WARNING: unknown event type: {event['type']}")
         event, new_state = None, state

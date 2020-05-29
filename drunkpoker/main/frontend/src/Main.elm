@@ -38,11 +38,26 @@ port tableNameReceiver : (String -> msg) -> Sub msg
 
 -- MODEL
 
+
+type alias PlayerId = String
+
+
+type alias Sip = Int
+
+
+type alias JsonResults =
+    { winners: List PlayerId
+    , drinkers: Dict PlayerId Sip
+    , scores: Dict PlayerId Int
+    }
+
+
 type alias JsonState =
     { seats: Dict String String
     , players: Dict String JsonPlayer
     , gameState: String
     , communityCards: Maybe (List Card)
+    , results: Maybe JsonResults
     }
 
 
@@ -51,6 +66,7 @@ type alias JsonPlayer =
     , state: String
     , cards: Maybe (List Card)
     , committedBy: Maybe Int
+    , showingCards: Bool
     }
 
 
@@ -80,6 +96,7 @@ type alias Player =
     , state: UiPlayerState
     , cards: Maybe (Card, Card)
     , committedBy: Maybe Int
+    , showingCards: Bool
     }
 
 
@@ -88,12 +105,32 @@ type EnumGameState =
     | GameOver
 
 
+type Score =
+    StraightFlush
+    | FourOfAKind
+    | FullHouse
+    | Flush
+    | Straight
+    | ThreeOfAKind
+    | TwoPairs
+    | Pair
+    | HighCard
+
+
+type alias Results =
+    { winnerNames: List (String)
+    , drinkerNamesAndSips: List ((String, Sip))
+    , namesAndScores: List ((String, Score))
+    }
+
+
 type alias GameState =
     { seats: Dict SeatNumber (Maybe Player)
     , gameState: EnumGameState
     , flop: Maybe (Card, Card, Card)
     , river: Maybe (Card)
     , turn: Maybe (Card)
+    , results: Maybe Results
     }
 
 
@@ -109,6 +146,7 @@ type alias Model =
   , hostName: String
   , gameState: GameState
   , seated: Seated
+  , preparingRaise: Maybe Int
   }
 
 
@@ -148,11 +186,13 @@ realInit =
         , flop = Nothing
         , river = Nothing
         , turn = Nothing
+        , results = Nothing
         }
       , playerName = ""
       , baseUrl = ""
       , seated = Not
       , hostName = "?"
+      , preparingRaise = Nothing
       }
     , Cmd.none
     )
@@ -168,6 +208,8 @@ init _ = realInit
 type Msg =
   Receive String
   | PrepareRaise
+  | Raise Int
+  | UpdateRaiseAmount String
   | Fold
   | Check
   | Call
@@ -178,6 +220,24 @@ type Msg =
   | EnterName SeatNumber
   | NameUpdate String
   | Sit Int
+
+
+getCommittedByOrZero: Maybe Player -> Int
+getCommittedByOrZero player =
+    case player of
+        Just it ->
+            Maybe.withDefault 0 << .committedBy <| it
+        Nothing ->
+            0
+
+
+maxBet: Model -> Int
+maxBet model =
+    Maybe.withDefault 0
+        <| List.maximum
+        <| List.map
+            (getCommittedByOrZero << Tuple.second)
+            (Dict.toList model.gameState.seats)
 
 
 getHostName: String -> String
@@ -196,23 +256,31 @@ cardDecoder =
 
 jsonStateDecoder: D.Decoder JsonState
 jsonStateDecoder =
-    D.map4 JsonState
+    D.map5 JsonState
         (D.field "seats" (D.dict D.string))
         (D.field "players"
             (D.dict
-                (D.map4 JsonPlayer
+                (D.map5 JsonPlayer
                     (D.field "name" D.string)
                     (D.field "state" D.string)
                     (D.maybe (D.field "cards"
                         (D.list cardDecoder))
                     )
                     (D.maybe (D.field "committed_by" D.int))
+                    (D.oneOf [D.field "show_cards" D.bool, D.succeed False])
                 )
             )
         )
         (D.field "game_state" D.string)
         (D.maybe (D.field "community_cards"
             (D.list cardDecoder)
+        ))
+        (D.maybe (D.field "results"
+            (D.map3 JsonResults
+                (D.field "winners" (D.list D.string))
+                (D.field "drinkers" (D.dict D.int))
+                (D.field "scores" (D.dict (D.index 0 D.int)))
+            )
         ))
 
 
@@ -242,6 +310,7 @@ gameStateFromJsonState jsonState =
                     Nothing -> Nothing
                 )
                 jsonPlayer.committedBy
+                jsonPlayer.showingCards
         makePlayer playerId seatNumber =
             case Dict.get playerId jsonState.players of
                 Nothing ->
@@ -279,6 +348,46 @@ gameStateFromJsonState jsonState =
                     Just (c5)
                 _ ->
                     Nothing
+        intEnumToCombination theInt =
+            case theInt of
+                0 -> HighCard
+                1 -> Pair
+                2 -> TwoPairs
+                3 -> ThreeOfAKind
+                4 -> Straight
+                5 -> Flush
+                6 -> FullHouse
+                7 -> FourOfAKind
+                8 -> StraightFlush
+                _ -> HighCard
+        idsToNames ids =
+            case ids of
+                id::tail ->
+                     Maybe.withDefault []
+                        (Maybe.map
+                            (List.singleton << .name)
+                            (Dict.get id jsonState.players))
+                     ++ idsToNames tail
+                [] -> []
+        idsXToNamesX idsX =
+            case idsX of
+                (id, x)::tail ->
+                    Maybe.withDefault
+                        []
+                        (Maybe.map
+                            (List.singleton << (\name -> (name, x)) << .name)
+                            (Dict.get id jsonState.players))
+                    ++ idsXToNamesX tail
+                [] -> []
+        gameResults =
+            case jsonState.results of
+                Nothing -> Nothing
+                Just theResults ->
+                    Just <| Results
+                        (theResults.winners)
+                        (idsXToNamesX (Dict.toList theResults.drinkers))
+                        ((List.map (Tuple.mapSecond intEnumToCombination)
+                            (idsXToNamesX (Dict.toList theResults.scores))))
     in
     GameState
         (Dict.fromList (List.map stringSeatPlayerIdToSeatNumberPlayer seatsAsTuple))
@@ -289,10 +398,11 @@ gameStateFromJsonState jsonState =
         flop
         river
         turn
+        gameResults
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model = Debug.log "The state: " <|
+update msg model = --Debug.log "The state: " <|
     let
         postAction action =
             Http.post
@@ -317,7 +427,7 @@ update msg model = Debug.log "The state: " <|
                     , Cmd.none
                     )
         PrepareRaise ->
-            ( model
+            ( { model | preparingRaise = Just (maxBet model) }
             , Cmd.none
             )
         Fold ->
@@ -354,7 +464,7 @@ update msg model = Debug.log "The state: " <|
             )
         ShowCards ->
             ( model
-            , Cmd.none
+            , Debug.log "sending: " <| postAction "showCards"
             )
         NextGame ->
             ( model
@@ -367,6 +477,22 @@ update msg model = Debug.log "The state: " <|
         Call ->
             ( model
             , postAction "call"
+            )
+        Raise amount ->
+            ( { model | preparingRaise = Nothing }
+            , Http.post
+                  { url = model.baseUrl ++ "/actions/raise"
+                  , expect = Http.expectWhatever Discard
+                  , body = Http.jsonBody
+                  <| Encode.object
+                      [ ("player_name", Encode.string model.playerName)
+                      , ("amount", Encode.int amount)
+                      ]
+                  }
+            )
+        UpdateRaiseAmount amount ->
+            ( { model | preparingRaise = Just (Maybe.withDefault (maxBet model) (String.toInt amount)) }
+            , Cmd.none
             )
 
 
@@ -416,6 +542,13 @@ interactCommonCss =
         , Css.color theme.cardWhite
         , Css.fontSize <| Css.pct 160
         , Css.fontWeight Css.bold
+        ]
+
+
+disabledInteractCommomCss =
+    Css.batch
+        [ interactCommonCss
+        , Css.backgroundColor theme.buttonGrey
         ]
 
 
@@ -665,23 +798,9 @@ inGameActions model =
                                 False
                     _ ->
                         False
-        getCommittedByOrZero: Maybe Player -> Int
-        getCommittedByOrZero player =
-            case player of
-                Just it ->
-                    Maybe.withDefault 0 << .committedBy <| it
-                Nothing ->
-                    0
-        maxBet: Int
-        maxBet =
-            Maybe.withDefault 0
-                <| List.maximum
-                <| List.map
-                    (getCommittedByOrZero << Tuple.second)
-                    (Dict.toList model.gameState.seats)
         hasToCall: Bool
         hasToCall =
-             (getCommittedByOrZero <| getMePlayer model) < maxBet
+             (getCommittedByOrZero <| getMePlayer model) < maxBet model
         offsetLeft: Float -> Css.Style
         offsetLeft pctOffset =
             Css.batch
@@ -689,6 +808,14 @@ inGameActions model =
                 , Css.left (Css.pct <| pctOffset + position.pctLeft)
                 , Css.position Css.absolute
                 ]
+        isPreparingRaise =
+            case model.preparingRaise of
+                Nothing -> False
+                Just _ -> True
+        commonCss =
+            if isPreparingRaise then disabledInteractCommomCss else interactCommonCss
+        raiseAmount =
+            Maybe.withDefault -1 model.preparingRaise
     in
     if shouldDisplayActions then
         [ button
@@ -696,23 +823,25 @@ inGameActions model =
                 [ interactCommonCss
                 , offsetLeft 0
                 ]
-            , onClick <| PrepareRaise
+            , onClick <| if isPreparingRaise then Raise raiseAmount else PrepareRaise
             ]
-            [ text "RAISE"]
+            [ text (if isPreparingRaise then "OK" else "RAISE") ]
         , button
             [ css
-                [ interactCommonCss
+                [ commonCss
                 , offsetLeft 10.1
                 ]
             , onClick <| Fold
+            , disabled isPreparingRaise
             ]
             [ text "FOLD"]
         , button
             [ css
-                [ interactCommonCss
+                [ commonCss
                 , offsetLeft 20.2
                 ]
             , onClick <| if hasToCall then Call else Check
+            , disabled isPreparingRaise
             ]
             [ text <| if hasToCall then "CALL" else "CHECK" ]
         ]
@@ -723,6 +852,11 @@ inGameActions model =
 gameOverActions: Model -> List (Html Msg)
 gameOverActions model =
     let
+        showCardsDisabled =
+            case getMePlayer model of
+                Just player ->
+                    player.showingCards
+                Nothing -> False
         isCurrentPlayerWaitingForNewGame =
             case getMePlayer model of
                 Just player ->
@@ -760,13 +894,13 @@ gameOverActions model =
                 [ css
                     [ interactCommonCss
                     , offsetLeft 10.1
-                    , Css.backgroundColor theme.buttonGrey
+                    , Css.backgroundColor
+                        (if showCardsDisabled then theme.buttonGrey else theme.buttonBlue)
                     ]
                 , onClick <| ShowCards
-                , disabled True
+                , disabled showCardsDisabled
                 ]
                 [ text "SHOW CARDS"]
-
     in
     if shouldDisplayActions then
         if isCurrentPlayerWaitingForNewGame then
@@ -775,6 +909,99 @@ gameOverActions model =
             [ buttonShowCards ]
     else
         []
+
+
+raiseSlider: Model -> List (Html Msg)
+raiseSlider model =
+    let
+        sliderThumbWidth = 6
+        sliderThumbHeight = 3.3
+        positionTop = 85
+        positionLeft = 69
+        textLeftOffset = 9.5
+        textTopOffset = -8
+        sliderStyle =
+            let
+                sliderThumbStyleFirefox =
+                    Css.batch
+                        [ Css.width (Css.pct sliderThumbWidth)
+                        , Css.borderRadius (Css.em 2)
+                        , Css.height (Css.vh sliderThumbHeight)
+                        , Css.backgroundColor theme.buttonBlue
+                        ]
+                sliderThumbStyleChrome =
+                    Css.batch
+                        [ Css.width (Css.pct sliderThumbWidth)
+                        , Css.borderRadius (Css.em 2)
+                        , Css.height (Css.vh sliderThumbHeight)
+                        , Css.property "background" theme.buttonBlue.value
+                        ]
+            in
+            Css.batch
+                [ Css.property "-webkit-appearance" "none"
+                , Css.backgroundColor theme.cardWhite
+                , Css.width (Css.pct 30)
+                , Css.height (Css.pct 3)
+                , Css.borderRadius (Css.em 2)
+                , Css.pseudoElement
+                     "-moz-range-thumb"
+                     [ Css.property "-moz-appearance" "none"
+                     , sliderThumbStyleFirefox
+                     ]
+                , Css.pseudoElement
+                    "-webkit-slider-thumb"
+                    [ Css.property "-webkit-appearance" "none"
+                    , Css.property "appearance" "none"
+                    , sliderThumbStyleChrome
+                    ]
+                ]
+        maxAmount = 20
+        amount = Maybe.withDefault (maxBet model) model.preparingRaise
+        stringAmount = String.fromInt <| amount
+        textStyle =
+            Css.batch
+                [ Css.color theme.cardWhite
+                , Css.fontSize <| Css.pct 160
+                , Css.fontWeight Css.bold
+                , Css.textAlign Css.right
+                , Css.width (Css.pct 20)
+                ]
+        shouldDisplay =
+            case model.preparingRaise of
+                Just _ -> True
+                Nothing -> False
+    in
+    if shouldDisplay then
+        [ input
+          [ css
+            [ Css.position Css.absolute
+            , Css.top (Css.pct positionTop)
+            , Css.left (Css.pct positionLeft)
+            , sliderStyle
+            ]
+          , type_ "range"
+          , Html.Styled.Attributes.min (String.fromInt <| maxBet model)
+          , Html.Styled.Attributes.max <| String.fromInt maxAmount
+          , value  <| stringAmount
+          , onInput UpdateRaiseAmount
+          ] []
+        , Html.Styled.p
+            [ css
+                [ Css.position Css.absolute
+                , Css.top (Css.pct <| positionTop + textTopOffset)
+                , Css.left (Css.pct <| positionLeft + textLeftOffset)
+                , textStyle
+                ]
+            ]
+            [ text (if amount /= maxAmount then stringAmount else "ALL IN !") ]
+        ]
+    else
+        []
+
+
+results: Model -> List (Html Msg)
+results model =
+    []
 
 
 view : Model -> Html Msg
@@ -791,6 +1018,8 @@ view model =
       ++ inGameActions model
       ++ gameOverActions model
       ++ communityCards model
+      ++ results model
+      ++ raiseSlider model
       ++
       [ div
             [ css

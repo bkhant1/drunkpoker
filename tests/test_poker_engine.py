@@ -1174,6 +1174,17 @@ class TestStartGame:
         assert "committed_by" not in new_state["players"]["other_id"]\
                or int(new_state["players"]["other_id"]["committed_by"]) == 0
 
+    def test_start_game_cleans_show_cards(self, iddle_game_with_4_players_and_a_dealer):
+        for player in iddle_game_with_4_players_and_a_dealer["players"].values():
+            player["show_cards"] = True
+        for player in iddle_game_with_4_players_and_a_dealer["players"].values():
+            assert player["show_cards"]
+
+        _, new_state = engine.start_game(iddle_game_with_4_players_and_a_dealer)
+
+        for player in new_state["players"].values():
+            assert "show_cards" not in player or not player["show_cards"]
+
 
 class TestStripStateForPlayer:
 
@@ -1184,14 +1195,18 @@ class TestStripStateForPlayer:
                 "deck": "A deck of cards",
                 "players": {
                     "id1": {
-                        "cards": "Some cards"
+                        "cards": "Some cards",
+                        "state": engine.PlayerState.IN_GAME
                     },
                     "id2": {
-                        "cards": "Some other cards"
+                        "cards": "Some other cards",
+                        "state": engine.PlayerState.FOLDED
                     },
-                    "id3": {}
-    
-                }
+                    "id3": {
+                        "state": engine.PlayerState.WAITING_NEW_GAME
+                    }
+                },
+                "game_state": engine.GameState.RIVER
             }
         return ret
 
@@ -1225,6 +1240,120 @@ class TestStripStateForPlayer:
         new_state = engine.strip_state_for_player(state_to_strip(), "id3")
         assert "cards" not in new_state["players"]["id1"]
         assert "cards" not in new_state["players"]["id2"]
+
+    def test_do_not_strip_on_game_over_game_went_to_end_of_turn(self):
+        state = {
+            'deck': engine.deck,
+            'players': {
+                "P1": {
+                    "state": engine.PlayerState.IN_GAME,
+                    "cards": "something 1"
+                },
+                "P2": {
+                    "state": engine.PlayerState.MY_TURN,
+                    "cards": "something 2"
+                },
+                "P3": {
+                    "state": engine.PlayerState.FOLDED,
+                    "cards": "something that will be stripped"
+                }
+            },
+            'game_state': engine.GameState.GAME_OVER,
+        }
+        new_state = engine.strip_state_for_player(state, "P-other")
+        assert new_state["players"]["P1"]["cards"] == "something 1"
+        assert new_state["players"]["P2"]["cards"] == "something 2"
+        assert "cards" not in new_state["players"]["P3"]
+
+    def test_do_not_strip_on_game_over_game_ended_by_folds(self):
+        state = {
+            'deck': engine.deck,
+            'players': {
+                "P1": {
+                    "state": engine.PlayerState.IN_GAME,
+                    "cards": "something 1"
+                },
+                "P2": {
+                    "state": engine.PlayerState.FOLDED,
+                    "cards": "something 2"
+                },
+                "P3": {
+                    "state": engine.PlayerState.FOLDED,
+                    "cards": "something 3"
+                }
+            },
+            'game_state': engine.GameState.GAME_OVER,
+        }
+        new_state = engine.strip_state_for_player(state, "P-other")
+        for player_id in ["P1", "P2", "P3"]:
+            assert "cards" not in new_state["players"][player_id]
+
+    def test_show_cards_game_over(self):
+        state = {
+            'deck': engine.deck,
+            'players': {
+                "P1": {
+                    "state": engine.PlayerState.IN_GAME,
+                    "cards": "something 1"
+                },
+                "P2": {
+                    "state": engine.PlayerState.FOLDED,
+                    "cards": "something 2",
+                    "show_cards": True
+                },
+                "P3": {
+                    "state": engine.PlayerState.FOLDED,
+                    "cards": "something 3"
+                }
+            },
+            'game_state': engine.GameState.GAME_OVER,
+        }
+        new_state = engine.strip_state_for_player(state, "P-other")
+        for player_id in ["P1", "P3"]:
+            assert "cards" not in new_state["players"][player_id]
+        assert new_state["players"]["P2"]["cards"] == "something 2"
+
+    def test_show_cards_game_not_over(self):
+        state = {
+            'deck': engine.deck,
+            'players': {
+                "P1": {
+                    "state": engine.PlayerState.IN_GAME,
+                    "cards": "something 1"
+                },
+                "P2": {
+                    "state": engine.PlayerState.FOLDED,
+                    "cards": "something 2",
+                    "show_cards": True
+                },
+                "P3": {
+                    "state": engine.PlayerState.FOLDED,
+                    "cards": "something 3"
+                }
+            },
+            'game_state': engine.GameState.TURN,
+        }
+        new_state = engine.strip_state_for_player(state, "P-other")
+        for player_id in ["P1", "P2", "P3"]:
+            assert "cards" not in new_state["players"][player_id]
+
+
+class TestShowCards:
+
+    def test_show_cards_player_does_not_exist(self):
+        state = {
+            "players": {}
+        }
+        with pytest.raises(engine.EventRejected):
+            engine.show_cards(state, "PX")
+
+    def test_show_cards(self):
+        state = {
+            "players": {"P1": {}}
+        }
+        event, new_state = engine.show_cards(state, "P1")
+        assert event is None
+        assert new_state["players"]["P1"]["show_cards"]
 
 
 class TestRankPlayers:
@@ -1297,6 +1426,20 @@ class TestGetBestCombination:
     x=[straight flush, four of a kind, ..., high card]
     y=[straight flush, four of a kind, ..., high card]
     """
+
+    def test_accept_list_of_list_instead_of_cards(self):
+        cards = [[2, Suit.SPADE],
+                 [3, Suit.SPADE],
+                 [4, Suit.SPADE],
+                 [6, Suit.SPADE],
+                 [7, Suit.HEART],
+                 [5, Suit.SPADE],
+                 [8, Suit.CLUBS]]
+
+        assert engine.best_combination(cards) == engine.Result(
+            combination=engine.Combinations.STRAIGHT_FLUSH,
+            best_cards=(6,)
+        )
 
     def test_straight_flush_against_higher_straight(self):
         cards = [Card(value=2, suit=Suit.SPADE),
@@ -2006,6 +2149,39 @@ class TestCall:
 
         assert new_state["players"][next_to_play]["state"] == engine.PlayerState.MY_TURN
 
+    @pytest.mark.parametrize(
+        "game_state",
+        [engine.GameState.PREFLOP, engine.GameState.FLOP, engine.GameState.RIVER, engine.GameState.TURN]
+    )
+    @pytest.mark.parametrize(
+        "turn_to",
+        ["P1", "P3", "P7", "P8"]
+    )
+    def test_call_last_player_on_all_in(self, base_table, add_player, turn_to, game_state):
+
+        def make_state(player_id):
+            return engine.PlayerState.MY_TURN if player_id == turn_to else engine.PlayerState.IN_GAME
+
+        def make_committed_by(player_id):
+            return 5 if player_id == turn_to else base_table['all_in']
+
+        add_player("P1", seat_number=1, committed_by=make_committed_by("P1"), state=make_state("P1"))
+        add_player("P2", seat_number=2, state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P3", seat_number=3, committed_by=make_committed_by("P3"), state=make_state("P3"))
+        add_player("P5", seat_number=5, state=engine.PlayerState.FOLDED)
+        add_player("P7", seat_number=7, committed_by=make_committed_by("P7"), state=make_state("P7"))
+        add_player("P8", seat_number=8, committed_by=make_committed_by("P8"), state=make_state("P8"))
+        base_table["game_state"] = game_state
+
+        event, new_state = engine.player_call(
+            base_table,
+            turn_to
+        )
+
+        for the_player_id in ["P1", "P3", "P7", "P8"]:
+            new_state["players"][the_player_id]["state"] == engine.PlayerState.MY_TURN
+        assert event == engine.next_state_event(game_state)
+
 
 @pytest.mark.parametrize(
     "action, number_of_cards, cards_already_there, next_state",
@@ -2154,6 +2330,21 @@ class TestDrawFlopRiverOrTurn:
         assert new_state["players"]["P5"]["state"] == engine.PlayerState.WAITING_NEW_GAME
         assert new_state["players"]["P8"]["state"] == engine.PlayerState.FOLDED
         assert new_state["game_state"] == next_state
+
+    def test_all_players_all_in_draws_next_step(
+        self, base_table, add_player, action,
+        number_of_cards, cards_already_there, next_state
+    ):
+        add_player("P1", seat_number=1, committed_by=base_table['all_in'], state=engine.PlayerState.IN_GAME)
+        add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
+        add_player("P6", seat_number=6, committed_by=base_table['all_in'], state=engine.PlayerState.IN_GAME)
+        add_player("P8", seat_number=8, committed_by=base_table['all_in'], state=engine.PlayerState.IN_GAME)
+
+        event, new_state = action(base_table)
+
+        for player_id in ["P1", "P6", "P8"]:
+            assert new_state["players"][player_id]["state"] == engine.PlayerState.IN_GAME
+        assert event == engine.next_state_event(next_state)
 
 
 class TestRaise:

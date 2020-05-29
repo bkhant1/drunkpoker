@@ -9813,6 +9813,7 @@ var $author$project$Main$realInit = _Utils_Tuple2(
 		gameState: {
 			flop: $elm$core$Maybe$Nothing,
 			gameState: $author$project$Main$GameInProgress,
+			results: $elm$core$Maybe$Nothing,
 			river: $elm$core$Maybe$Nothing,
 			seats: $elm$core$Dict$fromList(
 				A2(
@@ -9823,6 +9824,7 @@ var $author$project$Main$realInit = _Utils_Tuple2(
 		},
 		hostName: '?',
 		playerName: '',
+		preparingRaise: $elm$core$Maybe$Nothing,
 		seated: $author$project$Main$Not
 	},
 	$elm$core$Platform$Cmd$none);
@@ -12112,39 +12114,60 @@ var $elm$http$Http$expectWhatever = function (toMsg) {
 				return $elm$core$Result$Ok(_Utils_Tuple0);
 			}));
 };
+var $author$project$Main$Flush = {$: 'Flush'};
 var $author$project$Main$Folded = {$: 'Folded'};
+var $author$project$Main$FourOfAKind = {$: 'FourOfAKind'};
+var $author$project$Main$FullHouse = {$: 'FullHouse'};
 var $author$project$Main$GameOver = {$: 'GameOver'};
-var $author$project$Main$GameState = F5(
-	function (seats, gameState, flop, river, turn) {
-		return {flop: flop, gameState: gameState, river: river, seats: seats, turn: turn};
+var $author$project$Main$GameState = F6(
+	function (seats, gameState, flop, river, turn, results) {
+		return {flop: flop, gameState: gameState, results: results, river: river, seats: seats, turn: turn};
 	});
+var $author$project$Main$HighCard = {$: 'HighCard'};
 var $author$project$Main$Iddle = function (a) {
 	return {$: 'Iddle', a: a};
 };
 var $author$project$Main$InGame = {$: 'InGame'};
 var $author$project$Main$MyTurn = {$: 'MyTurn'};
-var $author$project$Main$Player = F4(
-	function (name, state, cards, committedBy) {
-		return {cards: cards, committedBy: committedBy, name: name, state: state};
+var $author$project$Main$Pair = {$: 'Pair'};
+var $author$project$Main$Player = F5(
+	function (name, state, cards, committedBy, showingCards) {
+		return {cards: cards, committedBy: committedBy, name: name, showingCards: showingCards, state: state};
 	});
 var $author$project$Main$Playing = F2(
 	function (a, b) {
 		return {$: 'Playing', a: a, b: b};
 	});
+var $author$project$Main$Results = F3(
+	function (winnerNames, drinkerNamesAndSips, namesAndScores) {
+		return {drinkerNamesAndSips: drinkerNamesAndSips, namesAndScores: namesAndScores, winnerNames: winnerNames};
+	});
+var $author$project$Main$Straight = {$: 'Straight'};
+var $author$project$Main$StraightFlush = {$: 'StraightFlush'};
+var $author$project$Main$ThreeOfAKind = {$: 'ThreeOfAKind'};
+var $author$project$Main$TwoPairs = {$: 'TwoPairs'};
 var $author$project$Main$WaitingNextGame = function (a) {
 	return {$: 'WaitingNextGame', a: a};
 };
 var $elm$core$Debug$log = _Debug_log;
+var $elm$core$Tuple$mapSecond = F2(
+	function (func, _v0) {
+		var x = _v0.a;
+		var y = _v0.b;
+		return _Utils_Tuple2(
+			x,
+			func(y));
+	});
 var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 	var turn = function () {
-		var _v17 = jsonState.communityCards;
-		if ((((((_v17.$ === 'Just') && _v17.a.b) && _v17.a.b.b) && _v17.a.b.b.b) && _v17.a.b.b.b.b) && _v17.a.b.b.b.b.b) {
-			var _v18 = _v17.a;
-			var _v19 = _v18.b;
-			var _v20 = _v19.b;
-			var _v21 = _v20.b;
-			var _v22 = _v21.b;
-			var c5 = _v22.a;
+		var _v22 = jsonState.communityCards;
+		if ((((((_v22.$ === 'Just') && _v22.a.b) && _v22.a.b.b) && _v22.a.b.b.b) && _v22.a.b.b.b.b) && _v22.a.b.b.b.b.b) {
+			var _v23 = _v22.a;
+			var _v24 = _v23.b;
+			var _v25 = _v24.b;
+			var _v26 = _v25.b;
+			var _v27 = _v26.b;
+			var c5 = _v27.a;
 			return $elm$core$Maybe$Just(c5);
 		} else {
 			return $elm$core$Maybe$Nothing;
@@ -12167,13 +12190,13 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 		});
 	var seatsAsTuple = $elm$core$Dict$toList(jsonState.seats);
 	var river = function () {
-		var _v11 = jsonState.communityCards;
-		if (((((_v11.$ === 'Just') && _v11.a.b) && _v11.a.b.b) && _v11.a.b.b.b) && _v11.a.b.b.b.b) {
-			var _v12 = _v11.a;
-			var _v13 = _v12.b;
-			var _v14 = _v13.b;
-			var _v15 = _v14.b;
-			var c4 = _v15.a;
+		var _v16 = jsonState.communityCards;
+		if (((((_v16.$ === 'Just') && _v16.a.b) && _v16.a.b.b) && _v16.a.b.b.b) && _v16.a.b.b.b.b) {
+			var _v17 = _v16.a;
+			var _v18 = _v17.b;
+			var _v19 = _v18.b;
+			var _v20 = _v19.b;
+			var c4 = _v20.a;
 			return $elm$core$Maybe$Just(c4);
 		} else {
 			return $elm$core$Maybe$Nothing;
@@ -12182,8 +12205,8 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 	var maybeTwoCardsFromCardsList = function (list) {
 		if (list.b && list.b.b) {
 			var card1 = list.a;
-			var _v10 = list.b;
-			var card2 = _v10.a;
+			var _v15 = list.b;
+			var card2 = _v15.a;
 			return $elm$core$Maybe$Just(
 				_Utils_Tuple2(card1, card2));
 		} else {
@@ -12192,39 +12215,40 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 	};
 	var jsonPlayerToPlayer = F2(
 		function (jsonPlayer, seatNumber) {
-			return A4(
+			return A5(
 				$author$project$Main$Player,
 				jsonPlayer.name,
 				A2(stringStateToUiState, jsonPlayer.state, seatNumber),
 				function () {
-					var _v8 = jsonPlayer.cards;
-					if (_v8.$ === 'Just') {
-						var cardList = _v8.a;
+					var _v13 = jsonPlayer.cards;
+					if (_v13.$ === 'Just') {
+						var cardList = _v13.a;
 						return maybeTwoCardsFromCardsList(cardList);
 					} else {
 						return $elm$core$Maybe$Nothing;
 					}
 				}(),
-				jsonPlayer.committedBy);
+				jsonPlayer.committedBy,
+				jsonPlayer.showingCards);
 		});
 	var makePlayer = F2(
 		function (playerId, seatNumber) {
-			var _v7 = A2($elm$core$Dict$get, playerId, jsonState.players);
-			if (_v7.$ === 'Nothing') {
+			var _v12 = A2($elm$core$Dict$get, playerId, jsonState.players);
+			if (_v12.$ === 'Nothing') {
 				return $elm$core$Maybe$Nothing;
 			} else {
-				var jsonPlayer = _v7.a;
+				var jsonPlayer = _v12.a;
 				return $elm$core$Maybe$Just(
 					A2(jsonPlayerToPlayer, jsonPlayer, seatNumber));
 			}
 		});
-	var stringSeatPlayerIdToSeatNumberPlayer = function (_v6) {
-		var stringSeat = _v6.a;
-		var playerId = _v6.b;
+	var stringSeatPlayerIdToSeatNumberPlayer = function (_v11) {
+		var stringSeat = _v11.a;
+		var playerId = _v11.b;
 		var seatNumber = function () {
-			var _v5 = $elm$core$String$toInt(stringSeat);
-			if (_v5.$ === 'Just') {
-				var result = _v5.a;
+			var _v10 = $elm$core$String$toInt(stringSeat);
+			if (_v10.$ === 'Just') {
+				var result = _v10.a;
 				return result;
 			} else {
 				return A2($elm$core$Debug$log, 'Seat number in wrong format', -1);
@@ -12234,28 +12258,122 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 			seatNumber,
 			A2(makePlayer, playerId, seatNumber));
 	};
+	var intEnumToCombination = function (theInt) {
+		switch (theInt) {
+			case 0:
+				return $author$project$Main$HighCard;
+			case 1:
+				return $author$project$Main$Pair;
+			case 2:
+				return $author$project$Main$TwoPairs;
+			case 3:
+				return $author$project$Main$ThreeOfAKind;
+			case 4:
+				return $author$project$Main$Straight;
+			case 5:
+				return $author$project$Main$Flush;
+			case 6:
+				return $author$project$Main$FullHouse;
+			case 7:
+				return $author$project$Main$FourOfAKind;
+			case 8:
+				return $author$project$Main$StraightFlush;
+			default:
+				return $author$project$Main$HighCard;
+		}
+	};
+	var idsXToNamesX = function (idsX) {
+		if (idsX.b) {
+			var _v1 = idsX.a;
+			var id = _v1.a;
+			var x = _v1.b;
+			var tail = idsX.b;
+			return _Utils_ap(
+				A2(
+					$elm$core$Maybe$withDefault,
+					_List_Nil,
+					A2(
+						$elm$core$Maybe$map,
+						A2(
+							$elm$core$Basics$composeL,
+							A2(
+								$elm$core$Basics$composeL,
+								$elm$core$List$singleton,
+								function (name) {
+									return _Utils_Tuple2(name, x);
+								}),
+							function ($) {
+								return $.name;
+							}),
+						A2($elm$core$Dict$get, id, jsonState.players))),
+				idsXToNamesX(tail));
+		} else {
+			return _List_Nil;
+		}
+	};
+	var idsToNames = function (ids) {
+		if (ids.b) {
+			var id = ids.a;
+			var tail = ids.b;
+			return _Utils_ap(
+				A2(
+					$elm$core$Maybe$withDefault,
+					_List_Nil,
+					A2(
+						$elm$core$Maybe$map,
+						A2(
+							$elm$core$Basics$composeL,
+							$elm$core$List$singleton,
+							function ($) {
+								return $.name;
+							}),
+						A2($elm$core$Dict$get, id, jsonState.players))),
+				idsToNames(tail));
+		} else {
+			return _List_Nil;
+		}
+	};
+	var gameResults = function () {
+		var _v8 = jsonState.results;
+		if (_v8.$ === 'Nothing') {
+			return $elm$core$Maybe$Nothing;
+		} else {
+			var theResults = _v8.a;
+			return $elm$core$Maybe$Just(
+				A3(
+					$author$project$Main$Results,
+					theResults.winners,
+					idsXToNamesX(
+						$elm$core$Dict$toList(theResults.drinkers)),
+					A2(
+						$elm$core$List$map,
+						$elm$core$Tuple$mapSecond(intEnumToCombination),
+						idsXToNamesX(
+							$elm$core$Dict$toList(theResults.scores)))));
+		}
+	}();
 	var flop = function () {
-		var _v1 = jsonState.communityCards;
-		if ((((_v1.$ === 'Just') && _v1.a.b) && _v1.a.b.b) && _v1.a.b.b.b) {
-			var _v2 = _v1.a;
-			var c1 = _v2.a;
-			var _v3 = _v2.b;
-			var c2 = _v3.a;
-			var _v4 = _v3.b;
-			var c3 = _v4.a;
+		var _v4 = jsonState.communityCards;
+		if ((((_v4.$ === 'Just') && _v4.a.b) && _v4.a.b.b) && _v4.a.b.b.b) {
+			var _v5 = _v4.a;
+			var c1 = _v5.a;
+			var _v6 = _v5.b;
+			var c2 = _v6.a;
+			var _v7 = _v6.b;
+			var c3 = _v7.a;
 			return $elm$core$Maybe$Just(
 				_Utils_Tuple3(c1, c2, c3));
 		} else {
 			return $elm$core$Maybe$Nothing;
 		}
 	}();
-	return A5(
+	return A6(
 		$author$project$Main$GameState,
 		$elm$core$Dict$fromList(
 			A2($elm$core$List$map, stringSeatPlayerIdToSeatNumberPlayer, seatsAsTuple)),
 		function () {
-			var _v0 = jsonState.gameState;
-			if (_v0 === 'GAME_OVER') {
+			var _v3 = jsonState.gameState;
+			if (_v3 === 'GAME_OVER') {
 				return $author$project$Main$GameOver;
 			} else {
 				return $author$project$Main$GameInProgress;
@@ -12263,7 +12381,8 @@ var $author$project$Main$gameStateFromJsonState = function (jsonState) {
 		}(),
 		flop,
 		river,
-		turn);
+		turn,
+		gameResults);
 };
 var $author$project$Main$getHostName = function (url) {
 	var _v0 = A2($elm$core$String$split, '/', url);
@@ -12284,14 +12403,19 @@ var $elm$http$Http$jsonBody = function (value) {
 		'application/json',
 		A2($elm$json$Json$Encode$encode, 0, value));
 };
-var $author$project$Main$JsonPlayer = F4(
-	function (name, state, cards, committedBy) {
-		return {cards: cards, committedBy: committedBy, name: name, state: state};
+var $author$project$Main$JsonPlayer = F5(
+	function (name, state, cards, committedBy, showingCards) {
+		return {cards: cards, committedBy: committedBy, name: name, showingCards: showingCards, state: state};
 	});
-var $author$project$Main$JsonState = F4(
-	function (seats, players, gameState, communityCards) {
-		return {communityCards: communityCards, gameState: gameState, players: players, seats: seats};
+var $author$project$Main$JsonResults = F3(
+	function (winners, drinkers, scores) {
+		return {drinkers: drinkers, scores: scores, winners: winners};
 	});
+var $author$project$Main$JsonState = F5(
+	function (seats, players, gameState, communityCards, results) {
+		return {communityCards: communityCards, gameState: gameState, players: players, results: results, seats: seats};
+	});
+var $elm$json$Json$Decode$bool = _Json_decodeBool;
 var $author$project$Main$Card = F2(
 	function (suit, value) {
 		return {suit: suit, value: value};
@@ -12303,7 +12427,7 @@ var $author$project$Main$cardDecoder = A3(
 	$author$project$Main$Card,
 	A2($elm$json$Json$Decode$index, 1, $elm$json$Json$Decode$string),
 	A2($elm$json$Json$Decode$index, 0, $elm$json$Json$Decode$int));
-var $elm$json$Json$Decode$map4 = _Json_map4;
+var $elm$json$Json$Decode$map5 = _Json_map5;
 var $elm$json$Json$Decode$oneOf = _Json_oneOf;
 var $elm$json$Json$Decode$maybe = function (decoder) {
 	return $elm$json$Json$Decode$oneOf(
@@ -12313,8 +12437,8 @@ var $elm$json$Json$Decode$maybe = function (decoder) {
 				$elm$json$Json$Decode$succeed($elm$core$Maybe$Nothing)
 			]));
 };
-var $author$project$Main$jsonStateDecoder = A5(
-	$elm$json$Json$Decode$map4,
+var $author$project$Main$jsonStateDecoder = A6(
+	$elm$json$Json$Decode$map5,
 	$author$project$Main$JsonState,
 	A2(
 		$elm$json$Json$Decode$field,
@@ -12324,8 +12448,8 @@ var $author$project$Main$jsonStateDecoder = A5(
 		$elm$json$Json$Decode$field,
 		'players',
 		$elm$json$Json$Decode$dict(
-			A5(
-				$elm$json$Json$Decode$map4,
+			A6(
+				$elm$json$Json$Decode$map5,
 				$author$project$Main$JsonPlayer,
 				A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string),
 				A2($elm$json$Json$Decode$field, 'state', $elm$json$Json$Decode$string),
@@ -12335,13 +12459,73 @@ var $author$project$Main$jsonStateDecoder = A5(
 						'cards',
 						$elm$json$Json$Decode$list($author$project$Main$cardDecoder))),
 				$elm$json$Json$Decode$maybe(
-					A2($elm$json$Json$Decode$field, 'committed_by', $elm$json$Json$Decode$int))))),
+					A2($elm$json$Json$Decode$field, 'committed_by', $elm$json$Json$Decode$int)),
+				$elm$json$Json$Decode$oneOf(
+					_List_fromArray(
+						[
+							A2($elm$json$Json$Decode$field, 'show_cards', $elm$json$Json$Decode$bool),
+							$elm$json$Json$Decode$succeed(false)
+						]))))),
 	A2($elm$json$Json$Decode$field, 'game_state', $elm$json$Json$Decode$string),
 	$elm$json$Json$Decode$maybe(
 		A2(
 			$elm$json$Json$Decode$field,
 			'community_cards',
-			$elm$json$Json$Decode$list($author$project$Main$cardDecoder))));
+			$elm$json$Json$Decode$list($author$project$Main$cardDecoder))),
+	$elm$json$Json$Decode$maybe(
+		A2(
+			$elm$json$Json$Decode$field,
+			'results',
+			A4(
+				$elm$json$Json$Decode$map3,
+				$author$project$Main$JsonResults,
+				A2(
+					$elm$json$Json$Decode$field,
+					'winners',
+					$elm$json$Json$Decode$list($elm$json$Json$Decode$string)),
+				A2(
+					$elm$json$Json$Decode$field,
+					'drinkers',
+					$elm$json$Json$Decode$dict($elm$json$Json$Decode$int)),
+				A2(
+					$elm$json$Json$Decode$field,
+					'scores',
+					$elm$json$Json$Decode$dict(
+						A2($elm$json$Json$Decode$index, 0, $elm$json$Json$Decode$int)))))));
+var $author$project$Main$getCommittedByOrZero = function (player) {
+	if (player.$ === 'Just') {
+		var it = player.a;
+		return A3(
+			$elm$core$Basics$composeL,
+			$elm$core$Maybe$withDefault(0),
+			function ($) {
+				return $.committedBy;
+			},
+			it);
+	} else {
+		return 0;
+	}
+};
+var $elm$core$List$maximum = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(
+			A3($elm$core$List$foldl, $elm$core$Basics$max, x, xs));
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
+var $author$project$Main$maxBet = function (model) {
+	return A2(
+		$elm$core$Maybe$withDefault,
+		0,
+		$elm$core$List$maximum(
+			A2(
+				$elm$core$List$map,
+				A2($elm$core$Basics$composeL, $author$project$Main$getCommittedByOrZero, $elm$core$Tuple$second),
+				$elm$core$Dict$toList(model.gameState.seats))));
+};
 var $elm$http$Http$Request = function (a) {
 	return {$: 'Request', a: a};
 };
@@ -12499,12 +12683,87 @@ var $elm$http$Http$post = function (r) {
 var $elm$core$Debug$toString = _Debug_toString;
 var $author$project$Main$update = F2(
 	function (msg, model) {
-		return A2(
-			$elm$core$Debug$log,
-			'The state: ',
-			function () {
-				var postAction = function (action) {
-					return $elm$http$Http$post(
+		var postAction = function (action) {
+			return $elm$http$Http$post(
+				{
+					body: $elm$http$Http$jsonBody(
+						$elm$json$Json$Encode$object(
+							_List_fromArray(
+								[
+									_Utils_Tuple2(
+									'player_name',
+									$elm$json$Json$Encode$string(model.playerName))
+								]))),
+					expect: $elm$http$Http$expectWhatever($author$project$Main$Discard),
+					url: model.baseUrl + ('/actions/' + action)
+				});
+		};
+		switch (msg.$) {
+			case 'Receive':
+				var message = msg.a;
+				var _v1 = A2($elm$json$Json$Decode$decodeString, $author$project$Main$jsonStateDecoder, message);
+				if (_v1.$ === 'Ok') {
+					var gameState = _v1.a;
+					return A2(
+						$elm$core$Debug$log,
+						'Decoded message: \n' + (message + ('\n to: \n' + $elm$core$Debug$toString(gameState))),
+						_Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									gameState: $author$project$Main$gameStateFromJsonState(gameState)
+								}),
+							$elm$core$Platform$Cmd$none));
+				} else {
+					var error = _v1.a;
+					return A2(
+						$elm$core$Debug$log,
+						'Error when decoding json state: ' + $elm$core$Debug$toString(error),
+						_Utils_Tuple2(model, $elm$core$Platform$Cmd$none));
+				}
+			case 'PrepareRaise':
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							preparingRaise: $elm$core$Maybe$Just(
+								$author$project$Main$maxBet(model))
+						}),
+					$elm$core$Platform$Cmd$none);
+			case 'Fold':
+				return _Utils_Tuple2(
+					model,
+					postAction('fold'));
+			case 'TableName':
+				var baseUrl = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							baseUrl: baseUrl,
+							hostName: $author$project$Main$getHostName(baseUrl)
+						}),
+					$elm$core$Platform$Cmd$none);
+			case 'Discard':
+				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+			case 'EnterName':
+				var seatNumber = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							seated: $author$project$Main$PickingName(seatNumber)
+						}),
+					$elm$core$Platform$Cmd$none);
+			case 'Sit':
+				var seatNumber = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							seated: $author$project$Main$Seated(seatNumber)
+						}),
+					$elm$http$Http$post(
 						{
 							body: $elm$http$Http$jsonBody(
 								$elm$json$Json$Encode$object(
@@ -12512,109 +12771,76 @@ var $author$project$Main$update = F2(
 										[
 											_Utils_Tuple2(
 											'player_name',
-											$elm$json$Json$Encode$string(model.playerName))
+											$elm$json$Json$Encode$string(model.playerName)),
+											_Utils_Tuple2(
+											'seat_number',
+											$elm$json$Json$Encode$int(seatNumber))
 										]))),
 							expect: $elm$http$Http$expectWhatever($author$project$Main$Discard),
-							url: model.baseUrl + ('/actions/' + action)
-						});
-				};
-				switch (msg.$) {
-					case 'Receive':
-						var message = msg.a;
-						var _v1 = A2($elm$json$Json$Decode$decodeString, $author$project$Main$jsonStateDecoder, message);
-						if (_v1.$ === 'Ok') {
-							var gameState = _v1.a;
-							return A2(
-								$elm$core$Debug$log,
-								'Decoded message: \n' + (message + ('\n to: \n' + $elm$core$Debug$toString(gameState))),
-								_Utils_Tuple2(
-									_Utils_update(
-										model,
-										{
-											gameState: $author$project$Main$gameStateFromJsonState(gameState)
-										}),
-									$elm$core$Platform$Cmd$none));
-						} else {
-							var error = _v1.a;
-							return A2(
-								$elm$core$Debug$log,
-								'Error when decoding json state: ' + $elm$core$Debug$toString(error),
-								_Utils_Tuple2(model, $elm$core$Platform$Cmd$none));
-						}
-					case 'PrepareRaise':
-						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-					case 'Fold':
-						return _Utils_Tuple2(
-							model,
-							postAction('fold'));
-					case 'TableName':
-						var baseUrl = msg.a;
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{
-									baseUrl: baseUrl,
-									hostName: $author$project$Main$getHostName(baseUrl)
-								}),
-							$elm$core$Platform$Cmd$none);
-					case 'Discard':
-						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-					case 'EnterName':
-						var seatNumber = msg.a;
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{
-									seated: $author$project$Main$PickingName(seatNumber)
-								}),
-							$elm$core$Platform$Cmd$none);
-					case 'Sit':
-						var seatNumber = msg.a;
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{
-									seated: $author$project$Main$Seated(seatNumber)
-								}),
-							$elm$http$Http$post(
-								{
-									body: $elm$http$Http$jsonBody(
-										$elm$json$Json$Encode$object(
-											_List_fromArray(
-												[
-													_Utils_Tuple2(
-													'player_name',
-													$elm$json$Json$Encode$string(model.playerName)),
-													_Utils_Tuple2(
-													'seat_number',
-													$elm$json$Json$Encode$int(seatNumber))
-												]))),
-									expect: $elm$http$Http$expectWhatever($author$project$Main$Discard),
-									url: model.baseUrl + '/actions/sit'
-								}));
-					case 'NameUpdate':
-						var name = msg.a;
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{playerName: name}),
-							$elm$core$Platform$Cmd$none);
-					case 'ShowCards':
-						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-					case 'NextGame':
-						return _Utils_Tuple2(
-							model,
-							postAction('nextGame'));
-					case 'Check':
-						return _Utils_Tuple2(
-							model,
-							postAction('check'));
-					default:
-						return _Utils_Tuple2(
-							model,
-							postAction('call'));
-				}
-			}());
+							url: model.baseUrl + '/actions/sit'
+						}));
+			case 'NameUpdate':
+				var name = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{playerName: name}),
+					$elm$core$Platform$Cmd$none);
+			case 'ShowCards':
+				return _Utils_Tuple2(
+					model,
+					A2(
+						$elm$core$Debug$log,
+						'sending: ',
+						postAction('showCards')));
+			case 'NextGame':
+				return _Utils_Tuple2(
+					model,
+					postAction('nextGame'));
+			case 'Check':
+				return _Utils_Tuple2(
+					model,
+					postAction('check'));
+			case 'Call':
+				return _Utils_Tuple2(
+					model,
+					postAction('call'));
+			case 'Raise':
+				var amount = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{preparingRaise: $elm$core$Maybe$Nothing}),
+					$elm$http$Http$post(
+						{
+							body: $elm$http$Http$jsonBody(
+								$elm$json$Json$Encode$object(
+									_List_fromArray(
+										[
+											_Utils_Tuple2(
+											'player_name',
+											$elm$json$Json$Encode$string(model.playerName)),
+											_Utils_Tuple2(
+											'amount',
+											$elm$json$Json$Encode$int(amount))
+										]))),
+							expect: $elm$http$Http$expectWhatever($author$project$Main$Discard),
+							url: model.baseUrl + '/actions/raise'
+						}));
+			default:
+				var amount = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							preparingRaise: $elm$core$Maybe$Just(
+								A2(
+									$elm$core$Maybe$withDefault,
+									$author$project$Main$maxBet(model),
+									$elm$core$String$toInt(amount)))
+						}),
+					$elm$core$Platform$Cmd$none);
+		}
 	});
 var $rtfeldman$elm_css$Css$Preprocess$AppendProperty = function (a) {
 	return {$: 'AppendProperty', a: a};
@@ -13060,6 +13286,15 @@ var $rtfeldman$elm_css$VirtualDom$Styled$text = function (str) {
 };
 var $rtfeldman$elm_css$Html$Styled$text = $rtfeldman$elm_css$VirtualDom$Styled$text;
 var $author$project$Main$gameOverActions = function (model) {
+	var showCardsDisabled = function () {
+		var _v3 = $author$project$Main$getMePlayer(model);
+		if (_v3.$ === 'Just') {
+			var player = _v3.a;
+			return player.showingCards;
+		} else {
+			return false;
+		}
+	}();
 	var shouldDisplayActions = function () {
 		var _v2 = model.gameState.gameState;
 		if (_v2.$ === 'GameInProgress') {
@@ -13103,10 +13338,11 @@ var $author$project$Main$gameOverActions = function (model) {
 					[
 						$author$project$Main$interactCommonCss,
 						offsetLeft(10.1),
-						$rtfeldman$elm_css$Css$backgroundColor($author$project$Main$theme.buttonGrey)
+						$rtfeldman$elm_css$Css$backgroundColor(
+						showCardsDisabled ? $author$project$Main$theme.buttonGrey : $author$project$Main$theme.buttonBlue)
 					])),
 				$rtfeldman$elm_css$Html$Styled$Events$onClick($author$project$Main$ShowCards),
-				$rtfeldman$elm_css$Html$Styled$Attributes$disabled(true)
+				$rtfeldman$elm_css$Html$Styled$Attributes$disabled(showCardsDisabled)
 			]),
 		_List_fromArray(
 			[
@@ -13137,16 +13373,15 @@ var $author$project$Main$Call = {$: 'Call'};
 var $author$project$Main$Check = {$: 'Check'};
 var $author$project$Main$Fold = {$: 'Fold'};
 var $author$project$Main$PrepareRaise = {$: 'PrepareRaise'};
-var $elm$core$List$maximum = function (list) {
-	if (list.b) {
-		var x = list.a;
-		var xs = list.b;
-		return $elm$core$Maybe$Just(
-			A3($elm$core$List$foldl, $elm$core$Basics$max, x, xs));
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
+var $author$project$Main$Raise = function (a) {
+	return {$: 'Raise', a: a};
 };
+var $author$project$Main$disabledInteractCommomCss = $rtfeldman$elm_css$Css$batch(
+	_List_fromArray(
+		[
+			$author$project$Main$interactCommonCss,
+			$rtfeldman$elm_css$Css$backgroundColor($author$project$Main$theme.buttonGrey)
+		]));
 var $author$project$Main$inGameActions = function (model) {
 	var shouldDisplayActions = function () {
 		var _v1 = model.seated;
@@ -13169,6 +13404,7 @@ var $author$project$Main$inGameActions = function (model) {
 			return false;
 		}
 	}();
+	var raiseAmount = A2($elm$core$Maybe$withDefault, -1, model.preparingRaise);
 	var position = {pctLeft: 69, pctTop: 92};
 	var offsetLeft = function (pctOffset) {
 		return $rtfeldman$elm_css$Css$batch(
@@ -13181,32 +13417,19 @@ var $author$project$Main$inGameActions = function (model) {
 					$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute)
 				]));
 	};
-	var getCommittedByOrZero = function (player) {
-		if (player.$ === 'Just') {
-			var it = player.a;
-			return A3(
-				$elm$core$Basics$composeL,
-				$elm$core$Maybe$withDefault(0),
-				function ($) {
-					return $.committedBy;
-				},
-				it);
+	var isPreparingRaise = function () {
+		var _v0 = model.preparingRaise;
+		if (_v0.$ === 'Nothing') {
+			return false;
 		} else {
-			return 0;
+			return true;
 		}
-	};
-	var maxBet = A2(
-		$elm$core$Maybe$withDefault,
-		0,
-		$elm$core$List$maximum(
-			A2(
-				$elm$core$List$map,
-				A2($elm$core$Basics$composeL, getCommittedByOrZero, $elm$core$Tuple$second),
-				$elm$core$Dict$toList(model.gameState.seats))));
+	}();
 	var hasToCall = _Utils_cmp(
-		getCommittedByOrZero(
+		$author$project$Main$getCommittedByOrZero(
 			$author$project$Main$getMePlayer(model)),
-		maxBet) < 0;
+		$author$project$Main$maxBet(model)) < 0;
+	var commonCss = isPreparingRaise ? $author$project$Main$disabledInteractCommomCss : $author$project$Main$interactCommonCss;
 	return shouldDisplayActions ? _List_fromArray(
 		[
 			A2(
@@ -13219,11 +13442,13 @@ var $author$project$Main$inGameActions = function (model) {
 							$author$project$Main$interactCommonCss,
 							offsetLeft(0)
 						])),
-					$rtfeldman$elm_css$Html$Styled$Events$onClick($author$project$Main$PrepareRaise)
+					$rtfeldman$elm_css$Html$Styled$Events$onClick(
+					isPreparingRaise ? $author$project$Main$Raise(raiseAmount) : $author$project$Main$PrepareRaise)
 				]),
 			_List_fromArray(
 				[
-					$rtfeldman$elm_css$Html$Styled$text('RAISE')
+					$rtfeldman$elm_css$Html$Styled$text(
+					isPreparingRaise ? 'OK' : 'RAISE')
 				])),
 			A2(
 			$rtfeldman$elm_css$Html$Styled$button,
@@ -13232,10 +13457,11 @@ var $author$project$Main$inGameActions = function (model) {
 					$rtfeldman$elm_css$Html$Styled$Attributes$css(
 					_List_fromArray(
 						[
-							$author$project$Main$interactCommonCss,
+							commonCss,
 							offsetLeft(10.1)
 						])),
-					$rtfeldman$elm_css$Html$Styled$Events$onClick($author$project$Main$Fold)
+					$rtfeldman$elm_css$Html$Styled$Events$onClick($author$project$Main$Fold),
+					$rtfeldman$elm_css$Html$Styled$Attributes$disabled(isPreparingRaise)
 				]),
 			_List_fromArray(
 				[
@@ -13248,11 +13474,12 @@ var $author$project$Main$inGameActions = function (model) {
 					$rtfeldman$elm_css$Html$Styled$Attributes$css(
 					_List_fromArray(
 						[
-							$author$project$Main$interactCommonCss,
+							commonCss,
 							offsetLeft(20.2)
 						])),
 					$rtfeldman$elm_css$Html$Styled$Events$onClick(
-					hasToCall ? $author$project$Main$Call : $author$project$Main$Check)
+					hasToCall ? $author$project$Main$Call : $author$project$Main$Check),
+					$rtfeldman$elm_css$Html$Styled$Attributes$disabled(isPreparingRaise)
 				]),
 			_List_fromArray(
 				[
@@ -13558,6 +13785,233 @@ var $author$project$Main$playerSits = function (model) {
 			5)
 		]);
 };
+var $author$project$Main$UpdateRaiseAmount = function (a) {
+	return {$: 'UpdateRaiseAmount', a: a};
+};
+var $rtfeldman$elm_css$Css$EmUnits = {$: 'EmUnits'};
+var $rtfeldman$elm_css$Css$em = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$EmUnits, 'em');
+var $rtfeldman$elm_css$Html$Styled$Attributes$max = $rtfeldman$elm_css$Html$Styled$Attributes$stringProperty('max');
+var $rtfeldman$elm_css$Html$Styled$Attributes$min = $rtfeldman$elm_css$Html$Styled$Attributes$stringProperty('min');
+var $rtfeldman$elm_css$Html$Styled$p = $rtfeldman$elm_css$Html$Styled$node('p');
+var $rtfeldman$elm_css$Css$Structure$PseudoElement = function (a) {
+	return {$: 'PseudoElement', a: a};
+};
+var $rtfeldman$elm_css$Css$Preprocess$WithPseudoElement = F2(
+	function (a, b) {
+		return {$: 'WithPseudoElement', a: a, b: b};
+	});
+var $rtfeldman$elm_css$Css$pseudoElement = function (element) {
+	return $rtfeldman$elm_css$Css$Preprocess$WithPseudoElement(
+		$rtfeldman$elm_css$Css$Structure$PseudoElement(element));
+};
+var $rtfeldman$elm_css$Css$right = $rtfeldman$elm_css$Css$prop1('right');
+var $rtfeldman$elm_css$Css$Internal$property = F2(
+	function (key, value) {
+		return $rtfeldman$elm_css$Css$Preprocess$AppendProperty(key + (':' + value));
+	});
+var $rtfeldman$elm_css$Css$Internal$getOverloadedProperty = F3(
+	function (functionName, desiredKey, style) {
+		getOverloadedProperty:
+		while (true) {
+			switch (style.$) {
+				case 'AppendProperty':
+					var str = style.a;
+					var key = A2(
+						$elm$core$Maybe$withDefault,
+						'',
+						$elm$core$List$head(
+							A2($elm$core$String$split, ':', str)));
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, key);
+				case 'ExtendSelector':
+					var selector = style.a;
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-selector'));
+				case 'NestSnippet':
+					var combinator = style.a;
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-combinator'));
+				case 'WithPseudoElement':
+					var pseudoElement = style.a;
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-pseudo-element setter'));
+				case 'WithMedia':
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-media-query'));
+				case 'WithKeyframes':
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-keyframes'));
+				default:
+					if (!style.a.b) {
+						return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-empty-Style'));
+					} else {
+						if (!style.a.b.b) {
+							var _v1 = style.a;
+							var only = _v1.a;
+							var $temp$functionName = functionName,
+								$temp$desiredKey = desiredKey,
+								$temp$style = only;
+							functionName = $temp$functionName;
+							desiredKey = $temp$desiredKey;
+							style = $temp$style;
+							continue getOverloadedProperty;
+						} else {
+							var _v2 = style.a;
+							var first = _v2.a;
+							var rest = _v2.b;
+							var $temp$functionName = functionName,
+								$temp$desiredKey = desiredKey,
+								$temp$style = $rtfeldman$elm_css$Css$Preprocess$ApplyStyles(rest);
+							functionName = $temp$functionName;
+							desiredKey = $temp$desiredKey;
+							style = $temp$style;
+							continue getOverloadedProperty;
+						}
+					}
+			}
+		}
+	});
+var $rtfeldman$elm_css$Css$Internal$IncompatibleUnits = {$: 'IncompatibleUnits'};
+var $rtfeldman$elm_css$Css$Internal$lengthForOverloadedProperty = A3($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$Internal$IncompatibleUnits, '', 0);
+var $rtfeldman$elm_css$Css$textAlign = function (fn) {
+	return A3(
+		$rtfeldman$elm_css$Css$Internal$getOverloadedProperty,
+		'textAlign',
+		'text-align',
+		fn($rtfeldman$elm_css$Css$Internal$lengthForOverloadedProperty));
+};
+var $rtfeldman$elm_css$Html$Styled$Attributes$type_ = $rtfeldman$elm_css$Html$Styled$Attributes$stringProperty('type');
+var $rtfeldman$elm_css$Html$Styled$Attributes$value = $rtfeldman$elm_css$Html$Styled$Attributes$stringProperty('value');
+var $author$project$Main$raiseSlider = function (model) {
+	var textTopOffset = -8;
+	var textStyle = $rtfeldman$elm_css$Css$batch(
+		_List_fromArray(
+			[
+				$rtfeldman$elm_css$Css$color($author$project$Main$theme.cardWhite),
+				$rtfeldman$elm_css$Css$fontSize(
+				$rtfeldman$elm_css$Css$pct(160)),
+				$rtfeldman$elm_css$Css$fontWeight($rtfeldman$elm_css$Css$bold),
+				$rtfeldman$elm_css$Css$textAlign($rtfeldman$elm_css$Css$right),
+				$rtfeldman$elm_css$Css$width(
+				$rtfeldman$elm_css$Css$pct(20))
+			]));
+	var textLeftOffset = 9.5;
+	var sliderThumbWidth = 6;
+	var sliderThumbHeight = 3.3;
+	var sliderStyle = function () {
+		var sliderThumbStyleFirefox = $rtfeldman$elm_css$Css$batch(
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Css$width(
+					$rtfeldman$elm_css$Css$pct(sliderThumbWidth)),
+					$rtfeldman$elm_css$Css$borderRadius(
+					$rtfeldman$elm_css$Css$em(2)),
+					$rtfeldman$elm_css$Css$height(
+					$rtfeldman$elm_css$Css$vh(sliderThumbHeight)),
+					$rtfeldman$elm_css$Css$backgroundColor($author$project$Main$theme.buttonBlue)
+				]));
+		var sliderThumbStyleChrome = $rtfeldman$elm_css$Css$batch(
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Css$width(
+					$rtfeldman$elm_css$Css$pct(sliderThumbWidth)),
+					$rtfeldman$elm_css$Css$borderRadius(
+					$rtfeldman$elm_css$Css$em(2)),
+					$rtfeldman$elm_css$Css$height(
+					$rtfeldman$elm_css$Css$vh(sliderThumbHeight)),
+					A2($rtfeldman$elm_css$Css$property, 'background', $author$project$Main$theme.buttonBlue.value)
+				]));
+		return $rtfeldman$elm_css$Css$batch(
+			_List_fromArray(
+				[
+					A2($rtfeldman$elm_css$Css$property, '-webkit-appearance', 'none'),
+					$rtfeldman$elm_css$Css$backgroundColor($author$project$Main$theme.cardWhite),
+					$rtfeldman$elm_css$Css$width(
+					$rtfeldman$elm_css$Css$pct(30)),
+					$rtfeldman$elm_css$Css$height(
+					$rtfeldman$elm_css$Css$pct(3)),
+					$rtfeldman$elm_css$Css$borderRadius(
+					$rtfeldman$elm_css$Css$em(2)),
+					A2(
+					$rtfeldman$elm_css$Css$pseudoElement,
+					'-moz-range-thumb',
+					_List_fromArray(
+						[
+							A2($rtfeldman$elm_css$Css$property, '-moz-appearance', 'none'),
+							sliderThumbStyleFirefox
+						])),
+					A2(
+					$rtfeldman$elm_css$Css$pseudoElement,
+					'-webkit-slider-thumb',
+					_List_fromArray(
+						[
+							A2($rtfeldman$elm_css$Css$property, '-webkit-appearance', 'none'),
+							A2($rtfeldman$elm_css$Css$property, 'appearance', 'none'),
+							sliderThumbStyleChrome
+						]))
+				]));
+	}();
+	var shouldDisplay = function () {
+		var _v0 = model.preparingRaise;
+		if (_v0.$ === 'Just') {
+			return true;
+		} else {
+			return false;
+		}
+	}();
+	var positionTop = 85;
+	var positionLeft = 69;
+	var maxAmount = 20;
+	var amount = A2(
+		$elm$core$Maybe$withDefault,
+		$author$project$Main$maxBet(model),
+		model.preparingRaise);
+	var stringAmount = $elm$core$String$fromInt(amount);
+	return shouldDisplay ? _List_fromArray(
+		[
+			A2(
+			$rtfeldman$elm_css$Html$Styled$input,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$Attributes$css(
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute),
+							$rtfeldman$elm_css$Css$top(
+							$rtfeldman$elm_css$Css$pct(positionTop)),
+							$rtfeldman$elm_css$Css$left(
+							$rtfeldman$elm_css$Css$pct(positionLeft)),
+							sliderStyle
+						])),
+					$rtfeldman$elm_css$Html$Styled$Attributes$type_('range'),
+					$rtfeldman$elm_css$Html$Styled$Attributes$min(
+					$elm$core$String$fromInt(
+						$author$project$Main$maxBet(model))),
+					$rtfeldman$elm_css$Html$Styled$Attributes$max(
+					$elm$core$String$fromInt(maxAmount)),
+					$rtfeldman$elm_css$Html$Styled$Attributes$value(stringAmount),
+					$rtfeldman$elm_css$Html$Styled$Events$onInput($author$project$Main$UpdateRaiseAmount)
+				]),
+			_List_Nil),
+			A2(
+			$rtfeldman$elm_css$Html$Styled$p,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$Attributes$css(
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute),
+							$rtfeldman$elm_css$Css$top(
+							$rtfeldman$elm_css$Css$pct(positionTop + textTopOffset)),
+							$rtfeldman$elm_css$Css$left(
+							$rtfeldman$elm_css$Css$pct(positionLeft + textLeftOffset)),
+							textStyle
+						]))
+				]),
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$text(
+					(!_Utils_eq(amount, maxAmount)) ? stringAmount : 'ALL IN !')
+				]))
+		]) : _List_Nil;
+};
+var $author$project$Main$results = function (model) {
+	return _List_Nil;
+};
 var $rtfeldman$elm_css$Svg$Styled$Attributes$rx = $rtfeldman$elm_css$VirtualDom$Styled$attribute('rx');
 var $rtfeldman$elm_css$Svg$Styled$Attributes$ry = $rtfeldman$elm_css$VirtualDom$Styled$attribute('ry');
 var $rtfeldman$elm_css$Svg$Styled$svg = $rtfeldman$elm_css$Svg$Styled$node('svg');
@@ -13589,48 +14043,52 @@ var $author$project$Main$view = function (model) {
 					$author$project$Main$gameOverActions(model),
 					_Utils_ap(
 						$author$project$Main$communityCards(model),
-						_List_fromArray(
-							[
-								A2(
-								$rtfeldman$elm_css$Html$Styled$div,
-								_List_fromArray(
-									[
-										$rtfeldman$elm_css$Html$Styled$Attributes$css(
-										_List_fromArray(
-											[
-												$rtfeldman$elm_css$Css$zIndex(
-												$rtfeldman$elm_css$Css$int(2)),
-												$rtfeldman$elm_css$Css$width(
-												$rtfeldman$elm_css$Css$pct(100)),
-												$rtfeldman$elm_css$Css$height(
-												$rtfeldman$elm_css$Css$pct(99.5))
-											]))
-									]),
+						_Utils_ap(
+							$author$project$Main$results(model),
+							_Utils_ap(
+								$author$project$Main$raiseSlider(model),
 								_List_fromArray(
 									[
 										A2(
-										$rtfeldman$elm_css$Svg$Styled$svg,
+										$rtfeldman$elm_css$Html$Styled$div,
 										_List_fromArray(
 											[
-												$rtfeldman$elm_css$Svg$Styled$Attributes$fill('#72b01dff'),
-												$rtfeldman$elm_css$Svg$Styled$Attributes$width('100%'),
-												$rtfeldman$elm_css$Svg$Styled$Attributes$height('100%')
+												$rtfeldman$elm_css$Html$Styled$Attributes$css(
+												_List_fromArray(
+													[
+														$rtfeldman$elm_css$Css$zIndex(
+														$rtfeldman$elm_css$Css$int(2)),
+														$rtfeldman$elm_css$Css$width(
+														$rtfeldman$elm_css$Css$pct(100)),
+														$rtfeldman$elm_css$Css$height(
+														$rtfeldman$elm_css$Css$pct(99.5))
+													]))
 											]),
 										_List_fromArray(
 											[
 												A2(
-												$rtfeldman$elm_css$Svg$Styled$ellipse,
+												$rtfeldman$elm_css$Svg$Styled$svg,
 												_List_fromArray(
 													[
-														$rtfeldman$elm_css$Svg$Styled$Attributes$cx('50%'),
-														$rtfeldman$elm_css$Svg$Styled$Attributes$cy('45%'),
-														$rtfeldman$elm_css$Svg$Styled$Attributes$rx('41%'),
-														$rtfeldman$elm_css$Svg$Styled$Attributes$ry('30%')
+														$rtfeldman$elm_css$Svg$Styled$Attributes$fill('#72b01dff'),
+														$rtfeldman$elm_css$Svg$Styled$Attributes$width('100%'),
+														$rtfeldman$elm_css$Svg$Styled$Attributes$height('100%')
 													]),
-												_List_Nil)
+												_List_fromArray(
+													[
+														A2(
+														$rtfeldman$elm_css$Svg$Styled$ellipse,
+														_List_fromArray(
+															[
+																$rtfeldman$elm_css$Svg$Styled$Attributes$cx('50%'),
+																$rtfeldman$elm_css$Svg$Styled$Attributes$cy('45%'),
+																$rtfeldman$elm_css$Svg$Styled$Attributes$rx('41%'),
+																$rtfeldman$elm_css$Svg$Styled$Attributes$ry('30%')
+															]),
+														_List_Nil)
+													]))
 											]))
-									]))
-							]))))));
+									]))))))));
 };
 var $author$project$Main$main = $elm$browser$Browser$element(
 	{
@@ -13640,4 +14098,4 @@ var $author$project$Main$main = $elm$browser$Browser$element(
 		view: A2($elm$core$Basics$composeL, $rtfeldman$elm_css$Html$Styled$toUnstyled, $author$project$Main$view)
 	});
 _Platform_export({'Main':{'init':$author$project$Main$main(
-	$elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.1"},"types":{"message":"Main.Msg","aliases":{"Main.SeatNumber":{"args":[],"type":"Basics.Int"}},"unions":{"Main.Msg":{"args":[],"tags":{"Receive":["String.String"],"PrepareRaise":[],"Fold":[],"Check":[],"Call":[],"ShowCards":[],"NextGame":[],"TableName":["String.String"],"Discard":["Result.Result Http.Error ()"],"EnterName":["Main.SeatNumber"],"NameUpdate":["String.String"],"Sit":["Basics.Int"]}},"Http.Error":{"args":[],"tags":{"BadUrl":["String.String"],"Timeout":[],"NetworkError":[],"BadStatus":["Basics.Int"],"BadBody":["String.String"]}},"Basics.Int":{"args":[],"tags":{"Int":[]}},"Result.Result":{"args":["error","value"],"tags":{"Ok":["value"],"Err":["error"]}},"String.String":{"args":[],"tags":{"String":[]}}}}})}});}(this));
+	$elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.1"},"types":{"message":"Main.Msg","aliases":{"Main.SeatNumber":{"args":[],"type":"Basics.Int"}},"unions":{"Main.Msg":{"args":[],"tags":{"Receive":["String.String"],"PrepareRaise":[],"Raise":["Basics.Int"],"UpdateRaiseAmount":["String.String"],"Fold":[],"Check":[],"Call":[],"ShowCards":[],"NextGame":[],"TableName":["String.String"],"Discard":["Result.Result Http.Error ()"],"EnterName":["Main.SeatNumber"],"NameUpdate":["String.String"],"Sit":["Basics.Int"]}},"Http.Error":{"args":[],"tags":{"BadUrl":["String.String"],"Timeout":[],"NetworkError":[],"BadStatus":["Basics.Int"],"BadBody":["String.String"]}},"Basics.Int":{"args":[],"tags":{"Int":[]}},"Result.Result":{"args":["error","value"],"tags":{"Ok":["value"],"Err":["error"]}},"String.String":{"args":[],"tags":{"String":[]}}}}})}});}(this));
