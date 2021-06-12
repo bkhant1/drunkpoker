@@ -1,7 +1,8 @@
+from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
-import drunkpoker.main.state as state
+import drunkpoker.main.state as persistent_state
 import drunkpoker.main.engine as engine
 import os
 import json
@@ -14,16 +15,20 @@ def get_host(headers):
     return ''
 
 
-class WelcomePage(AsyncHttpConsumer):
+class BootstrapElm(AsyncHttpConsumer):
 
     async def handle(self, body):
+        print(f'New player joining')
+        await database_sync_to_async(self.scope["session"].save)()
+        if "table_name" in self.scope["url_route"]["kwargs"]:
+            pass
+        with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:
+            reply = f.read()
         await self.send_response(
             200,
-            bytes(
-                f"Welcome, go to <here>/table/<table_name_of_your_choice> and ask friends to join you if you have some",
-                encoding="utf-8"),
+            bytes(reply, encoding="utf-8"),
             headers=[
-                (b"Content-Type", b"text/plain")
+                (b"Content-Type", b"text/html")
             ]
         )
 
@@ -38,23 +43,6 @@ class ElmApp(AsyncHttpConsumer):
             bytes(reply, encoding="utf-8"),
             headers=[
                 (b"Content-Type", b"text/javascript")
-            ]
-        )
-
-
-class JoinTable(AsyncHttpConsumer):
-
-    async def handle(self, body):
-        print(f'New player joining')
-        self.scope["session"]["player_joined"] = True
-        with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:
-            reply = f.read()
-        reply = reply.replace('<TABLE_NAME>', self.scope["url_route"]["kwargs"]["table_name"])
-        await self.send_response(
-            200,
-            bytes(reply, encoding="utf-8"),
-            headers=[
-                (b"Content-Type", b"text/html")
             ]
         )
 
@@ -87,18 +75,20 @@ class PlayerActions(AsyncHttpConsumer):
             f'{player_id}')
 
         table_name = self.scope["url_route"]["kwargs"]["table_name"]
-        table_group_name = 'table_%s' % table_name
+        table_type = self.scope["url_route"]["kwargs"]["table_type"]
+        table_group_name = f'table_{table_type}_{table_name}'
 
         new_state = engine.process_event(
-            await state.get_table(table_name),
+            await persistent_state.get_table(table_name, table_type),
             {
                 "type": self.event_type(),
                 "player_id": player_id,
                 "parameters": json.loads(body)
             }
         )
-        await state.set_table(
+        await persistent_state.set_table(
             table_name,
+            table_type,
             new_state
         )
         await self.channel_layer.group_send(
@@ -125,7 +115,8 @@ class StreamGameState(AsyncWebsocketConsumer):
         print(f'Player connected: {player_id}')
 
         self.table_name = self.scope['url_route']['kwargs']['table_name']
-        self.table_group_name = 'table_%s' % self.table_name
+        self.table_type = self.scope['url_route']['kwargs']['table_type']
+        self.table_group_name = f'table_{self.table_type}_{self.table_name}'
 
         # Join room group
         await self.channel_layer.group_add(
@@ -136,7 +127,7 @@ class StreamGameState(AsyncWebsocketConsumer):
         await self.accept()
         await self.send(text_data=json.dumps(
             engine.strip_state_for_player(
-                await state.get_table(self.table_name),
+                await persistent_state.get_table(self.table_name, self.table_type),
                 player_id
             )
         ))
@@ -148,14 +139,15 @@ class StreamGameState(AsyncWebsocketConsumer):
             print(f"Player leaving {player_id}")
 
             new_state = engine.process_event(
-                await state.get_table(self.table_name),
+                await persistent_state.get_table(self.table_name, self.table_type),
                 {
                     "type": engine.Event.PLAYER_LEAVE,
                     "player_id": player_id,
                 }
             )
-            await state.set_table(
+            await persistent_state.set_table(
                 self.table_name,
+                self.table_type,
                 new_state
             )
             await self.channel_layer.group_send(

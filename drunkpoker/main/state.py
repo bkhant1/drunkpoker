@@ -1,27 +1,22 @@
 from drunkpoker.main.models import Table
-from drunkpoker.main.engine import initial_state, is_table_empty
+from drunkpoker.main.engine import initial_state
 from channels.db import database_sync_to_async
 import json
 
 
 @database_sync_to_async
-def get_table(name):
+def get_table(name, table_type):
     try:
-        return json.loads(Table.objects.get(name=name).state)
+        return json.loads(Table.objects.get(name=f"{table_type}_{name}").state)
     except Table.DoesNotExist:
-        return initial_state()
+        return initial_state(table_type)
 
 
 @database_sync_to_async
-def set_table(name, state):
+def set_table(name, table_type, state):
     try:
-        the_table = Table.objects.get(name=name)
+        the_table = Table.objects.get(name=f"{table_type}_{name}")
     except Table.DoesNotExist:
-        the_table = Table(name=name)
+        the_table = Table(name=f"{table_type}_{name}")
     the_table.state = json.dumps(state)
-    if is_table_empty(state):
-        print("Deleting (or not saving) table as no player on it")
-        the_table.delete()
-    else:
-        the_table.save()
-
+    the_table.save()

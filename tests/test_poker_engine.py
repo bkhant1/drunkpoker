@@ -23,19 +23,30 @@ def shuffled_test_deck():
 @pytest.fixture
 def add_player(base_table):
 
-    def do_it(player_id, seat_number="1", state=engine.PlayerState.IN_GAME, committed_by=None, cards=[]):
+    def do_it(
+        player_id,
+        player_name="no_name",
+        seat_number="1",
+        state=engine.PlayerState.IN_GAME,
+        committed_by=None,
+        cards=[],
+        stack=1000
+    ):
         base_table["seats"][str(seat_number)] = player_id
         base_table["players"][player_id] = {
             **{
-                "state": state
+                "state": state,
+                "name": player_name
             },
             **({
-                "committed_by": committed_by
-            } if committed_by else {}),
+                "committed_by": (committed_by if committed_by is not None else 0)
+            }),
             **({
                 "cards": cards
             } if cards else {})
         }
+        if base_table["game_type"] == "normal":
+            base_table["players_stacks"][player_id] = stack
         return base_table["players"][player_id]
 
     return do_it
@@ -43,33 +54,20 @@ def add_player(base_table):
 
 @pytest.fixture
 def empty_table():
-    return {
-        'deck': list(engine.deck),
-        'community_cards': [],
-        'seats': {
-            "1": "",
-            "2": "",
-            "3": "",
-            "4": "",
-            "5": "",
-            "6": "",
-            "7": "",
-            "8": "",
-            "9": "",
-            "10": ""
-        },
-        'dealing': "",
-        'players': {},
-        'game_state': engine.GameState.NOT_STARTED,
-        'small_blind': 1,
-        'big_blind': 2,
-        'all_in': 20
-    }
+    the_table = engine.initial_state()
+    the_table['deck'] = list(engine.deck)  # Deterministic deck order for tests
+    return the_table
 
 
 @pytest.fixture
 def base_table(empty_table):
     return empty_table
+
+
+@pytest.fixture
+def base_not_drunk_table(base_table):
+    base_table["game_type"] = "normal"
+    return base_table
 
 
 @pytest.fixture
@@ -99,6 +97,7 @@ def table_with_one_player():
             "9": "",
             "10": ""
         },
+        'game_type': "drinking",
         'dealing': "",
         'players': {
             "abcd1234": {
@@ -109,7 +108,8 @@ def table_with_one_player():
         'game_state': engine.GameState.NOT_STARTED,
         'small_blind': 1,
         'big_blind': 2,
-        'all_in': 20
+        'all_in': 20,
+        'game_type': 'drinking'
     }
 
 
@@ -130,6 +130,7 @@ def iddle_game_with_two_players():
             "9": "",
             "10": ""
         },
+        'game_type': "drinking",
         'dealing': "",
         'players': {
             "abcd1234": {
@@ -164,6 +165,7 @@ def iddle_game_with_4_players_and_a_dealer():
             "9": "",
             "10": ""
         },
+        'game_type': "drinking",
         'dealing': "3",
         'players': {
             "p1": {
@@ -202,6 +204,7 @@ def ongoing_game_with_two_players():
             "6": "",
             "5": "",
         },
+        'game_type': "drinking",
         'dealing': "3",
         'players': {
             "abcd1234": {
@@ -219,7 +222,7 @@ def ongoing_game_with_two_players():
         },
         'game_state': engine.GameState.PREFLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
     }
 
 
@@ -259,7 +262,8 @@ def ongoing_game_with_three_players_one_folded():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -299,7 +303,8 @@ def ongoing_game_with_three_players_all_in_game():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -339,7 +344,8 @@ def ongoing_game_all_called_turn_to_small_blind_to_raise_or_call():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -379,7 +385,8 @@ def ongoing_game_all_called_turn_to_small_blind_to_check_or_raise():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -419,7 +426,8 @@ def ongoing_game_all_called_turn_to_big_blind_to_call_or_raise():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -459,7 +467,8 @@ def ongoing_game_all_called_turn_to_big_blind_to_check_or_raise():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -508,7 +517,8 @@ def ongoing_game_partially_called_partially_folded():
         },
         'game_state': engine.GameState.PREFLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -558,7 +568,8 @@ def ongoing_game_partially_called_partially_folded_last_call():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -607,7 +618,8 @@ def ongoing_game_partially_checked_partially_folded_not_last_to_check_or_raise()
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -656,7 +668,8 @@ def ongoing_game_partially_checked_partially_folded_last_to_check_or_raise():
         },
         'game_state': engine.GameState.PREFLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -700,7 +713,8 @@ def ongoing_game_with_player_waiting():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -750,7 +764,8 @@ def ongoing_game_all_folded():
         },
         'game_state': engine.GameState.FLOP,
         'small_blind': 1,
-        'big_blind': 2
+        'big_blind': 2,
+        'game_type': "drinking",
     }
 
 
@@ -776,7 +791,8 @@ def game_with_two_players_aligned_p1_to_check_or_raise():
         "game_state": "PREFLOP",
         "dealing": "1",
         "small_blind": 2,
-        "big_blind": 2}
+        "big_blind": 2,
+        'game_type': "drinking"}
 
 
 class TestSit:
@@ -792,7 +808,8 @@ class TestSit:
         assert event is None
         assert new_state["players"]["wxyz6789"] == {
             "state": engine.PlayerState.WAITING_NEW_GAME,
-            "name": "Paul"
+            "name": "Paul",
+            "committed_by": 0
         }
         assert new_state["seats"]["5"] == "wxyz6789"
         # Checking nothing else change by reverting "by hand"
@@ -800,13 +817,20 @@ class TestSit:
         new_state["seats"]["5"] = ""
         assert new_state == saved_state
 
-    def test_sit_player_on_empty_table(self, empty_table, table_with_one_player):
-        assert engine.sit_player(
+    def test_sit_player_on_empty_table(self, empty_table):
+        event, new_state = engine.sit_player(
             empty_table,
             "abcd1234",
             "Quentin",
             3
-        ) == (None, table_with_one_player)
+        )
+        assert event is None
+        assert new_state["players"]["abcd1234"] == {
+            "state": engine.PlayerState.WAITING_NEW_GAME,
+            "name": "Quentin",
+            "committed_by": 0
+        }
+        assert new_state["seats"]["3"] == "abcd1234"
 
     def test_sit_on_occupied_seat(self, table_with_one_player):
         with pytest.raises(engine.EventRejected):
@@ -838,13 +862,35 @@ class TestSit:
         assert len(state["players"]) == 2
         assert state["players"]["helloid"] == {
             "name": "Jack",
-            "state": engine.PlayerState.WAITING_NEW_GAME
+            "state": engine.PlayerState.WAITING_NEW_GAME,
+            "committed_by": 0
         }
+        # Was already there
         assert state["players"]["abcd1234"] == {
             "name": "Quentin",
             "state": engine.PlayerState.WAITING_NEW_GAME
         }
         assert state["seats"]["4"] == "helloid"
+
+    def test_sit_on_not_drunk_empty_table(self, base_not_drunk_table):
+        event, state = engine.sit_player(
+            base_not_drunk_table,
+            "id_xyz",
+            "Jack",
+            4
+        )
+        assert "id_xyz" in state["players_stacks"] and state["players_stacks"]["id_xyz"] == 1000
+
+    def test_sit_on_table_where_you_already_have_a_stack(self, base_not_drunk_table, add_player):
+        base_not_drunk_table["players_stacks"]["id_xyz"] = 123
+        event, state = engine.sit_player(
+            base_not_drunk_table,
+            "id_xyz",
+            "Jack",
+            4
+        )
+        assert event is None
+        assert state["players_stacks"]["id_xyz"] == 123
 
 
 class TestProcessEvent:
@@ -880,6 +926,29 @@ class TestProcessEvent:
                 }
             )
             assert new_state == "Dummy_state"
+
+    def test_multievent(self):
+        with mock.patch('drunkpoker.main.engine.start_game') as mock_start_game,\
+             mock.patch('drunkpoker.main.engine.exclude_player') as mock_exclude_player,\
+             mock.patch('drunkpoker.main.engine.end_game') as mock_end_game,\
+             mock.patch('drunkpoker.main.engine.resolve_stacks') as mock_resolve_stacks:
+            multi_event = {
+                "type": engine.Event.MULTI_EVENT,
+                "events": [{"type": engine.Event.PLAYER_LEAVE, "player_id": "P1"},
+                           {"type": engine.Event.END_GAME}]
+            }
+            mock_start_game.return_value = (multi_event, "dummy_state_1")
+            mock_exclude_player.return_value = {"type": engine.Event.RESOLVE_STACKS}, "dummy_state_2"
+            mock_resolve_stacks.return_value = None, "dummy_state_3"
+            mock_end_game.return_value = None, "dummy_state_4"
+
+            new_state = engine.process_event("dummy_state_0", {"type": engine.Event.START_GAME})
+
+            mock_start_game.assert_called_once_with("dummy_state_0")
+            mock_exclude_player.assert_called_once_with("dummy_state_1", "P1")
+            mock_resolve_stacks.assert_called_once_with("dummy_state_2")
+            mock_end_game.assert_called_once_with("dummy_state_3")
+            assert new_state == "dummy_state_4"
 
 
 class TestDetermineNextDealer:
@@ -1047,7 +1116,8 @@ class TestExcludePlayer:
             "scores": {
                 "other_id": None,
                 "other_other_id": None
-            }
+            },
+            "ranking": [["other_other_id"], ["other_id"]]
         }
 
     def test_exclude_waiting_for_new_game_player(self, ongoing_game_with_three_players_one_waiting):
@@ -1106,6 +1176,14 @@ class TestExcludePlayer:
         assert new_state["players"]["other_id"]["state"] == engine.PlayerState.WAITING_NEW_GAME
         assert new_state["players"]["other_other_id"]["state"] == engine.PlayerState.WAITING_NEW_GAME
         assert len([seat for seat in new_state["seats"] if new_state["seats"][seat]]) == 2
+
+    def test_exclude_player_in_normal_game_keeps_their_stack(self, base_not_drunk_table, add_player):
+        add_player("id_xyz", stack=123)
+        _, new_state = engine.exclude_player(
+            base_not_drunk_table,
+            "id_xyz"
+        )
+        assert new_state["players_stacks"]["id_xyz"] == 123
 
 
 class TestStartGame:
@@ -1184,6 +1262,19 @@ class TestStartGame:
 
         for player in new_state["players"].values():
             assert "show_cards" not in player or not player["show_cards"]
+
+    def test_start_not_drinking_does_not_reset_stacks(self, base_not_drunk_table, add_player):
+        add_player("player_id_1", seat_number=1, state=engine.PlayerState.WAITING_NEW_GAME, stack=123)
+        add_player("player_id_2", seat_number=2, state=engine.PlayerState.WAITING_NEW_GAME, stack=321)
+        base_not_drunk_table["players_stacks"]["former_player_id"] = 10000
+
+        _, new_state = engine.start_game(base_not_drunk_table)
+
+        assert new_state["players_stacks"] == {
+            "player_id_1": 123,
+            "player_id_2": 321,
+            "former_player_id": 10000
+        }
 
 
 class TestStripStateForPlayer:
@@ -1675,7 +1766,10 @@ class TestEndGame:
             "scores": {
                 "P2": None,
                 "P1": None
-            }
+            },
+            "ranking": [
+                ["P2"], ["P1"]
+            ]
         }
 
     def test_end_game_big_table_by_fold(self, base_table, add_player):
@@ -1701,7 +1795,10 @@ class TestEndGame:
                 "P2": None,
                 "P4": None,
                 "P6": None
-            }
+            },
+            "ranking": [
+                ["P4"], ["P1", "P2", "P6"]
+            ]
         }
 
     @pytest.mark.parametrize("winners", [["P1"], ["P2"], ["P3"]])
@@ -1743,16 +1840,35 @@ class TestEndGame:
 
             event, new_state = engine.end_game(base_table)
 
-            assert event is None
-            assert new_state["game_state"] == engine.GameState.GAME_OVER
-            assert new_state["results"]["drinkers"] == {
-                "P2": 4,
-                "P5": 5
-            }
-            assert new_state["results"]["scores"] == {
-                "P1": "scoreP1",
-                "P5": "scoreP5"
-            }
+        assert event is None
+        assert new_state["game_state"] == engine.GameState.GAME_OVER
+        assert new_state["results"]["drinkers"] == {
+            "P2": 4,
+            "P5": 5,
+            "P8": 0
+        }
+        assert new_state["results"]["scores"] == {
+            "P1": "scoreP1",
+            "P5": "scoreP5",
+        }
+        assert new_state["results"]["ranking"] == [["P1"], ["P5"], ["P2", "P8"]]
+
+    def test_end_game_with_folds_and_non_folds_ranking_is_correct(self, base_table, add_player):
+        add_player("P1", seat_number="1", committed_by=5)
+        add_player("P2", seat_number="2", committed_by=4, state=engine.PlayerState.FOLDED)
+        add_player("P3", seat_number="3", state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P5", seat_number="5", committed_by=5)
+        add_player("P8", seat_number="5", state=engine.PlayerState.FOLDED)
+
+        with mock.patch('drunkpoker.main.engine.rank_players') as mock_rank_players:
+            mock_rank_players.return_value = [
+                [("P1", "scoreP1")],
+                [("P5", "scoreP5")],
+            ]
+
+            event, new_state = engine.end_game(base_table)
+
+        assert new_state["results"]["ranking"] == [["P1"], ["P5"], ["P2", "P8"]]
 
     def test_end_game_end_to_end_ie_not_mocking_rank_players(self, base_table, add_player):
         add_player("P1", cards=[Card(value=14, suit=Suit.HEART), Card(value=14, suit=Suit.SPADE)])
@@ -1773,6 +1889,50 @@ class TestEndGame:
             "P1": (engine.Combinations.FULL_HOUSE, (13, 14)),
             "P2": (engine.Combinations.FULL_HOUSE, (13, 14))
         }
+
+    def test_end_game_doesnt_affect_committed_by(self, base_table, add_player):
+        add_player("P1", committed_by=10, cards=[Card(value=14, suit=Suit.HEART), Card(value=14, suit=Suit.SPADE)])
+        add_player("P2", committed_by=10, cards=[Card(value=14, suit=Suit.CLUBS), Card(value=14, suit=Suit.DIAMONDS)])
+        add_player("P3", committed_by=5, state=engine.PlayerState.FOLDED)
+        base_table["community_cards"] = \
+            [Card(value=13, suit=Suit.HEART),
+             Card(value=13, suit=Suit.SPADE),
+             Card(value=13, suit=Suit.DIAMONDS),
+             Card(value=12, suit=Suit.HEART),
+             Card(value=11, suit=Suit.HEART)]
+
+        event, new_state = engine.end_game(base_table)
+
+        assert new_state["players"]["P1"]["committed_by"] == 10
+        assert new_state["players"]["P2"]["committed_by"] == 10
+        assert new_state["players"]["P3"]["committed_by"] == 5
+
+    def test_end_not_drinking_game_triggers_stacks_resolution(self, base_not_drunk_table, add_player):
+        add_player("P1", seat_number="1", committed_by=100)
+        add_player("P5", seat_number="5", committed_by=100)
+
+        with mock.patch('drunkpoker.main.engine.rank_players') as mock_rank_players:
+            mock_rank_players.return_value = [
+                [("P1", "scoreP1")],
+                [("P5", "scoreP5")],
+            ]
+            event, _ = engine.end_game(base_not_drunk_table)
+
+        assert event == {"type": engine.Event.RESOLVE_STACKS}
+
+    def test_end_game_doesnt_reset_committed_by(self, base_not_drunk_table, add_player):
+        add_player("P1", seat_number="1", committed_by=100)
+        add_player("P5", seat_number="5", committed_by=200)
+
+        with mock.patch('drunkpoker.main.engine.rank_players') as mock_rank_players:
+            mock_rank_players.return_value = [
+                [("P1", "scoreP1")],
+                [("P5", "scoreP5")],
+            ]
+            _, new_state = engine.end_game(base_not_drunk_table)
+
+        assert new_state["players"]["P1"]["committed_by"] == 100
+        assert new_state["players"]["P5"]["committed_by"] == 200
 
 
 class TestFold:
@@ -1981,6 +2141,24 @@ class TestCheckOrCallOrFold:
 
         assert event == engine.Event.make_event(engine.Event.END_GAME)
 
+    def test_not_drunk_table_skips_players_that_are_all_in(
+            self,
+            action,
+            base_not_drunk_table,
+            add_player,
+            game_state_preflop):
+        add_player("P1", seat_number=4, committed_by=4, state=engine.PlayerState.MY_TURN)
+        add_player("P5", seat_number=5, committed_by=1, stack=1, state=engine.PlayerState.IN_GAME)  # them all in
+        add_player("P7", seat_number=7, committed_by=3, state=engine.PlayerState.IN_GAME)
+        add_player("P8", seat_number=8, committed_by=4, state=engine.PlayerState.IN_GAME)
+
+        event, new_state = action(
+            base_not_drunk_table,
+            "P1"
+        )
+
+        assert new_state["players"]["P7"]["state"] == engine.PlayerState.MY_TURN
+
 
 class TestCheck:
 
@@ -2120,6 +2298,36 @@ class TestCall:
         for player in ["P1", "P3", "P8"]:
             assert new_state["players"][player]["state"] == engine.PlayerState.IN_GAME
 
+    def test_small_blind_calls_a_raise_go_to_next_round(self, base_table, add_player, game_state_preflop):
+        add_player("P1", seat_number=1, committed_by=3, state=engine.PlayerState.MY_TURN)
+        add_player("P2", seat_number=2, state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P2", seat_number=2, committed_by=6)
+        base_table["dealing"] = "1"  # Means big blind is P2 (player before dealer)
+
+        event, new_state = engine.player_call(
+            base_table,
+            "P1"
+        )
+
+        assert event == engine.Event.make_event(engine.Event.DRAW_FLOP)
+        assert new_state["players"]["P1"]["committed_by"] == 6
+
+    def test_call_big_blind_aligning_all_passes_hand_to_big_blind(self, base_table, add_player, game_state_preflop):
+        add_player("P1", seat_number=1, committed_by=2)
+        add_player("P2", seat_number=2, committed_by=1, state=engine.PlayerState.MY_TURN)
+        add_player("P3", seat_number=3, committed_by=2)
+        base_table["big_blind"] == 2
+        base_table["dealing"] = "1"  # Means big blind is P3 (player before dealer)
+
+        event, new_state = engine.player_call(
+            base_table,
+            "P2"
+        )
+
+        assert event is None
+        assert new_state["players"]["P1"]["committed_by"] == 2
+        assert new_state["players"]["P3"]["state"] == engine.PlayerState.MY_TURN
+
     @pytest.mark.parametrize(
         "turn_to, next_to_play",
         [("P1", "P3"), ("P3", "P7"), ("P7", "P8")]
@@ -2181,6 +2389,28 @@ class TestCall:
         for the_player_id in ["P1", "P3", "P7", "P8"]:
             new_state["players"][the_player_id]["state"] == engine.PlayerState.MY_TURN
         assert event == engine.next_state_event(game_state)
+
+    @pytest.mark.parametrize(
+        "other_player_committed_by, stack, maxed_out",
+        [
+            (10, 15, False),
+            (16, 15, True),
+            (400, 200, True),
+            (15, 15, True),
+            (0, 15, False)
+        ]
+    )
+    def test_call_not_drinking_table_correct_amount(
+        self, base_not_drunk_table, add_player, other_player_committed_by, stack, maxed_out, game_state_preflop
+    ):
+        add_player("P1", seat_number=1, committed_by=0, stack=stack, state=engine.PlayerState.MY_TURN)
+        add_player(
+            "P5", seat_number=5, committed_by=other_player_committed_by, stack=100, state=engine.PlayerState.IN_GAME)
+
+        _, state = engine.player_call(base_not_drunk_table, player_id="P1")
+
+        assert state["players"]["P1"]["committed_by"] == (stack if maxed_out else other_player_committed_by)
+        assert state["players_stacks"]["P1"] == stack
 
 
 @pytest.mark.parametrize(
@@ -2346,6 +2576,37 @@ class TestDrawFlopRiverOrTurn:
             assert new_state["players"][player_id]["state"] == engine.PlayerState.IN_GAME
         assert event == engine.next_state_event(next_state)
 
+    def test_not_drinking_all_players_all_in_draws_next_step(
+        self, base_not_drunk_table, add_player, action,
+        number_of_cards, cards_already_there, next_state
+    ):
+        add_player("P1", seat_number=1, committed_by=20, stack=20, state=engine.PlayerState.IN_GAME)
+        add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
+        add_player("P6", seat_number=6, committed_by=15, stack=15, state=engine.PlayerState.IN_GAME)
+        add_player("P8", seat_number=8, committed_by=20, stack=100, state=engine.PlayerState.IN_GAME)
+
+        event, new_state = action(base_not_drunk_table)
+
+        for player_id in ["P1", "P6", "P8"]:
+            assert new_state["players"][player_id]["state"] == engine.PlayerState.IN_GAME
+        assert event == engine.next_state_event(next_state)
+
+    def test_not_drinking_all_players_called_at_drinking_all_amount_amount_doesnt_draw_next_step(
+        self, base_not_drunk_table, add_player, action,
+        number_of_cards, cards_already_there, next_state
+    ):
+        add_player("P1", seat_number=1, committed_by=base_not_drunk_table['all_in'], state=engine.PlayerState.IN_GAME)
+        add_player("P4", seat_number=4, state=engine.PlayerState.FOLDED)
+        add_player("P6", seat_number=6, committed_by=base_not_drunk_table['all_in'], state=engine.PlayerState.IN_GAME)
+        add_player("P8", seat_number=8, committed_by=base_not_drunk_table['all_in'], state=engine.PlayerState.IN_GAME)
+
+        event, new_state = action(base_not_drunk_table)
+
+        for player_id in ["P6", "P8"]:
+            assert new_state["players"][player_id]["state"] == engine.PlayerState.IN_GAME
+        assert new_state["players"]["P1"]["state"] == engine.PlayerState.MY_TURN
+        assert event is None
+
 
 class TestRaise:
 
@@ -2458,3 +2719,323 @@ class TestRaise:
         assert event is None
         assert new_state["players"][turn_to]["state"] == engine.PlayerState.IN_GAME
         assert new_state["players"][next_to_play]["state"] == engine.PlayerState.MY_TURN
+
+    def test_raise_not_drunk_table_skips_players_that_are_all_in(
+            self,
+            base_not_drunk_table,
+            add_player,
+            game_state_preflop):
+
+        add_player("P1", seat_number=1, committed_by=1, state=engine.PlayerState.MY_TURN)
+        add_player("P5", seat_number=5, committed_by=1, stack=1, state=engine.PlayerState.IN_GAME)  # them all in
+        add_player("P6", seat_number=5, committed_by=9, stack=9, state=engine.PlayerState.IN_GAME)  # them all in
+        add_player("P7", seat_number=7, committed_by=3, state=engine.PlayerState.IN_GAME)
+
+        event, new_state = engine.player_raise(
+            base_not_drunk_table,
+            "P1",
+            10
+        )
+
+        assert new_state["players"]["P7"]["state"] == engine.PlayerState.MY_TURN
+
+    @pytest.mark.parametrize(
+        "raise_amount, committed_by, stack, is_ok",
+        [
+            (2,  5, 15, True),
+            (10, 5, 15, True),
+            (10, 6, 15, False),
+            (11, 5, 15, False),
+            (15, 0, 15, True),
+            (16, 0, 15, False),
+            (200, 0, 200, True)
+        ]
+    )
+    def test_raise_not_drinking_table_correct_amount_and_validation(
+        self, base_not_drunk_table, add_player, raise_amount, committed_by, stack, is_ok, game_state_preflop
+    ):
+        add_player("P1", seat_number=1, committed_by=committed_by, stack=stack, state=engine.PlayerState.MY_TURN)
+        add_player("P5", seat_number=5, committed_by=2, stack=100, state=engine.PlayerState.IN_GAME)
+
+        do_raise = lambda: engine.player_raise(base_not_drunk_table, player_id="P1", amount=raise_amount)
+
+        if is_ok:
+            _, state = do_raise()
+            assert state["players"]["P1"]["committed_by"] == raise_amount + committed_by
+            assert state["players_stacks"]["P1"] == stack
+        else:
+            old_state = copy.deepcopy(base_not_drunk_table)
+            with pytest.raises(engine.EventRejected):
+                do_raise()
+            assert old_state == base_not_drunk_table
+
+
+class TestResolveStacks:
+    """
+    Worth noting that we assume the stack didn't have it's player commitment deduced yet when resolving
+    """
+
+    @pytest.mark.parametrize(
+        "game_state",
+        [state for state in engine.GameState.enumerate_state() if state != engine.GameState.GAME_OVER]
+    )
+    def test_resolve_stack_game_not_over(self, base_not_drunk_table, game_state):
+        base_not_drunk_table["game_state"] = game_state
+        with pytest.raises(engine.EventRejected):
+            _, _ = engine.resolve_stacks(base_not_drunk_table)
+
+    def test_resolve_stack_one_winner_one_looser(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P2"], ["P1"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event is None
+        assert isinstance(new_state["players_stacks"]["P1"], int)
+        assert isinstance(new_state["players_stacks"]["P2"], int)
+        assert new_state["players_stacks"]["P1"] == 90
+        assert new_state["players_stacks"]["P2"] == 110
+
+    def test_resolve_stack_two_winners_one_looser(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P2", "P3"], "P1"]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event is None
+        assert new_state["players_stacks"]["P1"] == 90
+        assert new_state["players_stacks"]["P2"] == 105
+        assert new_state["players_stacks"]["P3"] == 105
+
+    def test_resolve_stack_one_winner_two_losers(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P2"], ["P1", "P3"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event is None
+        assert new_state["players_stacks"]["P1"] == 90
+        assert new_state["players_stacks"]["P2"] == 120
+        assert new_state["players_stacks"]["P3"] == 90
+
+    def test_resolve_stack_one_winner_two_looser_of_which_one_out(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=5, stack=100, state=engine.PlayerState.FOLDED)
+        add_player("P3", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P1"], ["P3"], ["P2"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event is None
+        assert new_state["players_stacks"]["P1"] == 115
+        assert new_state["players_stacks"]["P2"] == 95
+        assert new_state["players_stacks"]["P3"] == 90
+
+    def test_resolve_stack_cant_win_more_than_commitment(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P1"], ["P3"], ["P2"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event is None
+        assert new_state["players_stacks"]["P1"] == 15
+        # assert new_state["players_stacks"]["P2"] == ?? -> see next test
+        # assert new_state["players_stacks"]["P3"] == ?? -> see next test
+
+    def test_resolve_stack_p1_win_not_full_pot_rest_of_pot_goes_to_others(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=20, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=20, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P1"], ["P3"], ["P2"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event is None
+        assert 30 + 100 + 80 == 10 + 100 + 100
+        assert new_state["players_stacks"]["P1"] == 30
+        assert new_state["players_stacks"]["P2"] == 80
+        assert new_state["players_stacks"]["P3"] == 100
+
+    def test_everyone_all_in_win_cascading(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=20, stack=20, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=30, stack=30, state=engine.PlayerState.IN_GAME)
+        add_player("P4", committed_by=40, stack=40, state=engine.PlayerState.IN_GAME)
+        add_player("P5", committed_by=40, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P1"], ["P2"], ["P3"], ["P4"], ["P5"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        # Total pot is 140
+        assert 50 + 80 + 10 + 0 + 60 == 10 + 20 + 30 + 40 + 100
+        assert new_state["players_stacks"]["P1"] == 50  # P1 wins 10 from all 5 players, pot is now 90
+        assert new_state["players_stacks"]["P2"] == 80  # P2 wins 20 from all 4 players left, pot is now 10
+        assert new_state["players_stacks"]["P3"] == 10  # P3 gets the rest of the pot
+        assert new_state["players_stacks"]["P4"] == 0
+        assert new_state["players_stacks"]["P5"] == 60
+
+    def test_pot_splitting_with_one_all_in(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=40, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=40, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P1"], ["P2", "P3"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event is None
+        assert new_state["players_stacks"]["P1"] == 30
+        assert new_state["players_stacks"]["P2"] == 90
+        assert new_state["players_stacks"]["P3"] == 90
+
+    def test_a_player_lost(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=40, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=40, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P2"], ["P1"], ["P3"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event == {
+            "type": engine.Event.PLAYERS_LOST,
+            "players_ids": ["P1"]
+        }
+        assert new_state["players_stacks"]["P1"] == 0
+        assert new_state["players_stacks"]["P2"] == 150
+        assert new_state["players_stacks"]["P3"] == 60
+
+    def test_two_players_lost(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P2"], ["P1"], ["P3"]]
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert event == {
+            "type": engine.Event.PLAYERS_LOST,
+            "players_ids": ["P1", "P3"]
+        }
+
+    @pytest.mark.parametrize(
+        "losers_rank",
+        [
+            [["P2", "P3"]],
+            [["P2"], ["P3"]],
+            [["P3"], ["P2"]]
+        ]
+    )
+    def test_pot_two_all_in_with_looser_having_less_than_winner(self, base_not_drunk_table, add_player, losers_rank):
+        add_player("P1", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=10, stack=100, state=engine.PlayerState.IN_GAME)
+        base_not_drunk_table["game_state"] = engine.GameState.GAME_OVER
+        base_not_drunk_table["results"] = {
+            "ranking": [["P1"]] + losers_rank
+        }
+
+        event, new_state = engine.resolve_stacks(base_not_drunk_table)
+
+        assert new_state["players_stacks"]["P1"] == 10 + 5 + 10
+        assert new_state["players_stacks"]["P2"] == 0
+        assert new_state["players_stacks"]["P3"] == 90
+
+
+class TestPlayersLost:
+
+    def test_players_lost_reset_stacks_and_generate_player_leave(self, base_not_drunk_table, add_player):
+        add_player("P1", stack=10)
+        add_player("P2", stack=0)
+        add_player("P3", stack=0)
+        old_state = copy.deepcopy(base_not_drunk_table)
+
+        event, new_state = engine.players_lost(base_not_drunk_table, ["P2", "P3"])
+
+        assert event == {
+            "type": engine.Event.MULTI_EVENT,
+            "events": [{"type": engine.Event.PLAYER_LEAVE, "player_id": "P2"},
+                       {"type": engine.Event.PLAYER_LEAVE, "player_id": "P3"}]
+        }
+        assert new_state["players_stacks"]["P2"] == 1000
+        assert new_state["players_stacks"]["P3"] == 1000
+        assert new_state["players_stacks"]["P1"] == 10
+
+        del new_state["players_stacks"]
+        del old_state["players_stacks"]
+        assert new_state == old_state
+
+
+class TestAllAllInNotDrinkingTable:
+
+    def test_all_actually_all_in(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        assert engine.all_players_all_in(base_not_drunk_table)
+
+    def test_all_actually_all_in_or_out(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P3", state=engine.PlayerState.WAITING_NEW_GAME)
+        add_player("P3", committed_by=2, stack=1000, state=engine.PlayerState.FOLDED)
+        assert engine.all_players_all_in(base_not_drunk_table)
+
+    def test_all_all_in_but_richest(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=5, stack=1000, state=engine.PlayerState.IN_GAME)
+        assert engine.all_players_all_in(base_not_drunk_table)
+
+    def test_all_all_in_by_different_amounts(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=10, stack=1000, state=engine.PlayerState.IN_GAME)
+        assert engine.all_players_all_in(base_not_drunk_table)
+
+    def test_battle_of_the_richest_is_not_all_in(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=5, stack=1000, state=engine.PlayerState.IN_GAME)
+        add_player("P4", committed_by=5, stack=1000, state=engine.PlayerState.IN_GAME)
+        assert not engine.all_players_all_in(base_not_drunk_table)
+
+    def test_if_richest_didnt_call_yet_its_not_all_in(self, base_not_drunk_table, add_player):
+        add_player("P1", committed_by=5, stack=5, state=engine.PlayerState.IN_GAME)
+        add_player("P2", committed_by=10, stack=10, state=engine.PlayerState.IN_GAME)
+        add_player("P3", committed_by=5, stack=1000, state=engine.PlayerState.IN_GAME)
+        assert not engine.all_players_all_in(base_not_drunk_table)

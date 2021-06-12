@@ -3,6 +3,8 @@ from enum import Enum, auto
 from collections import namedtuple
 from random import shuffle
 from itertools import groupby
+from typing import List, Tuple
+import copy
 
 
 class EventRejected(Exception):
@@ -44,6 +46,13 @@ class GameState:
     @classmethod
     def is_ongoing(cls, state):
         return state == cls.PREFLOP or state == cls.RIVER or state == cls.FLOP or state == cls.TURN
+
+    @classmethod
+    def enumerate_state(cls):
+        return [
+            cls.__dict__[it] for it in cls.__dict__
+            if isinstance(cls.__dict__[it], str) and '__' not in it
+        ]
 
 
 class Suit:
@@ -94,7 +103,7 @@ def shuffle_deck():
     return the_deck
 
 
-def initial_state():
+def initial_state(game_type="drinking"):
     """
     The initial state, any state should *always* be serializable to json
     Players is a dict with who's playing order as keys
@@ -118,9 +127,11 @@ def initial_state():
         'players': {},
         'game_state': GameState.NOT_STARTED,
         'dealing': '',
-        'small_blind': 1,
-        'big_blind': 2,
-        'all_in': 20
+        'small_blind': 1 if game_type == "drinking" else 10,
+        'big_blind': 2 if game_type == "drinking" else 20,
+        'all_in': 20,  # Maximum sips all-in, unused for normal game
+        'game_type': game_type,
+        'players_stacks': {}  # Memory of the size of a player stack, unused for drinking game
     }
 
 
@@ -134,17 +145,20 @@ class Event(Enum):
     PLAYER_SIT = auto()
     PLAYER_LEAVE = auto()
     PLAYER_READY_FOR_NEXT_GAME = auto()
+    PLAYERS_LOST = auto()
     START_GAME = auto()
     FOLD = auto()
     CHECK = auto()
     CALL = auto()
     RAISE = auto()
     END_GAME = auto()
+    RESOLVE_STACKS = auto()
     SHOW_CARDS = auto()
     NONE = auto()
     DRAW_FLOP = auto()
     DRAW_RIVER = auto()
     DRAW_TURN = auto()
+    MULTI_EVENT = auto()
 
     @staticmethod
     def make_event(event):
@@ -263,9 +277,14 @@ def sit_player(state, player_id, player_name, seat_number):
 
     state["players"][player_id] = {
         "name": player_name,
-        "state": PlayerState.WAITING_NEW_GAME
+        "state": PlayerState.WAITING_NEW_GAME,
+        "committed_by": 0
     }
     state["seats"][str(seat_number)] = player_id
+
+    if state["game_type"] == "normal":
+        if player_id not in state["players_stacks"]:
+            state["players_stacks"][player_id] = 1000
 
     if sum([1 if seated_player_id else 0 for seated_player_id in state["seats"].values()]) > 1 \
             and state["game_state"] == GameState.NOT_STARTED:
@@ -339,7 +358,7 @@ def count_if(list_, predicate):
     return sum([1 for x in list_ if predicate(x)])
 
 
-def find_player_ids_if(players, predicate):
+def find_player_ids_if(players, predicate) -> List[str]:
     return [x[0] for x in players.items() if predicate(x[1])]
 
 
@@ -350,20 +369,52 @@ def all_folded_but_one(players):
 
 
 def all_players_all_in(state):
+    if state["game_type"] != "normal":
+        return all([
+            (True if ("committed_by" in player and player["committed_by"] == state["all_in"])
+                     or not PlayerState.could_play(player["state"])
+             else False)
+            for player in state["players"].values()
+        ])
+    else:
+        players_in_game_not_folded_and_maxed_out = {
+            player_id for player_id, player in state["players"].items()
+            if (
+                "committed_by" in state["players"][player_id]
+                and state["players_stacks"][player_id] == player["committed_by"]
+            )
+        }
+        players_in_game_and_not_folded = {
+            player_id for player_id, player in state["players"].items()
+            if PlayerState.could_play(player["state"])
+        }
+        players_in_game_not_maxed_out = players_in_game_and_not_folded - players_in_game_not_folded_and_maxed_out
+        if len(players_in_game_not_maxed_out) > 1:
+            return False
+        elif len(players_in_game_not_maxed_out) == 0:
+            return True
+        else:
+            return state["players"][players_in_game_not_maxed_out.pop()]["committed_by"] == get_max_bet(state)
+
+
+def all_aligned(state):
+    players = state["players"].values()
+    one_player_in_game_commitment = [
+        player["committed_by"] for player in players
+        if PlayerState.could_play(player["state"])
+    ][0]
     return all([
-        (True if ("committed_by" in player and player["committed_by"] == state["all_in"])
-                 or not PlayerState.could_play(player["state"])
-         else False)
-        for player in state["players"].values()
+        player["committed_by"] == one_player_in_game_commitment
+        for player in players
     ])
 
 
 def get_max_bet(state):
     return max([
-                   player["committed_by"]
-                   for player in state["players"].values()
-                   if "committed_by" in player
-               ] + [0])
+        player["committed_by"]
+        for player in state["players"].values()
+        if "committed_by" in player
+    ] + [0])
 
 
 def next_state_event(game_state):
@@ -386,8 +437,9 @@ def next_state_event(game_state):
 def determine_next_players_for_this_round(state, current_player_id):
     """
     Returns a tuple: (
-        [1]: players after current player that are not folded
-        [2]: players before current player that are not folder AND not aligned with the max bet
+        [1]: players after current player that are not folded (AND not all-in for normal game)
+        [2]: players before current player that are not folded AND not aligned with the max bet (AND not all-in
+             for normal game)
     )
     """
     players_in_order = remove_empty(
@@ -397,13 +449,22 @@ def determine_next_players_for_this_round(state, current_player_id):
         )
     )
 
+    def is_in_game(player_id):
+        return (
+            state["players"][player_id]["state"] == PlayerState.IN_GAME
+            and (
+                state["game_type"] != "normal"
+                or int(state["players_stacks"][player_id]) > int(state["players"][player_id]["committed_by"])
+            )
+        )
+
     # Find out players that have to play in order:
     current_player_index = players_in_order.index(current_player_id)
     # players after the current player that are not folded
     players_after_current_not_folded = [
         player_id
         for player_id in players_in_order[current_player_index + 1:]
-        if state["players"][player_id]["state"] == PlayerState.IN_GAME
+        if is_in_game(player_id)
     ]
     # players before the current player that are not folded AND not aligned with the max bet
     players_before_current = players_in_order[:current_player_index]
@@ -411,7 +472,7 @@ def determine_next_players_for_this_round(state, current_player_id):
     players_before_current_not_folded_not_aligned = [
         player_id_
         for player_id_ in players_before_current
-        if (state["players"][player_id_]["state"] == PlayerState.IN_GAME
+        if (is_in_game(player_id_)
             and (
                 state["players"][player_id_]["committed_by"] if "committed_by" in state["players"][player_id_] else 0
             ) < max_bet)
@@ -420,7 +481,7 @@ def determine_next_players_for_this_round(state, current_player_id):
     return players_after_current_not_folded, players_before_current_not_folded_not_aligned
 
 
-def rank_players(players, community_cards):
+def rank_players(players, community_cards) -> List[List[Tuple[str, Result]]]:
     def key(player_id_combination_tuple):
         return player_id_combination_tuple[1]
 
@@ -443,26 +504,29 @@ def rank_players(players, community_cards):
 def generate_end_game_results(state):
     # By fold
     if all_folded_but_one(state["players"]):
+        folded_players = find_player_ids_if(
+            state["players"],
+            lambda player: player["state"] == PlayerState.FOLDED
+        )
+        non_folded_player = find_player_ids_if(
+            state["players"],
+            lambda player: PlayerState.is_in_game(player["state"]) and player["state"] != PlayerState.FOLDED
+        )
         return {
-            "winners": find_player_ids_if(
-                state["players"],
-                lambda player: PlayerState.is_in_game(player["state"]) and player["state"] != PlayerState.FOLDED
-            ),
+            "winners": non_folded_player,
             "drinkers": {
                 player_id: state["players"][player_id]["committed_by"]
-                for player_id in find_player_ids_if(
-                state["players"],
-                lambda player: player["state"] == PlayerState.FOLDED
-            )
+                for player_id in folded_players
                 if "committed_by" in state["players"][player_id]
             },
             "scores": {
                 player_id: None
                 for player_id in find_player_ids_if(
-                state["players"],
-                lambda player: PlayerState.is_in_game(player["state"])
-            )
-            }
+                    state["players"],
+                    lambda player: PlayerState.is_in_game(player["state"])
+                )
+            },
+            "ranking": [non_folded_player] + [folded_players]
         }
     # By end of turn round
     else:
@@ -499,7 +563,11 @@ def generate_end_game_results(state):
                 for loser_id in losers_ids
                 if "committed_by" in state["players"][loser_id]
             },
-            "scores": scores
+            "scores": scores,
+            "ranking": [
+                [player_id_and_score[0] for player_id_and_score in list_of_players_and_score]
+                for list_of_players_and_score in players_ranked_with_score
+            ] + [folded_player_ids]
         }
 
 
@@ -606,17 +674,29 @@ def draw_turn(state):
 def player_call(state, player_id):
     validate_check_or_call_or_fold(state, player_id)
 
+    if all_aligned(state):
+        return player_check(state, player_id)
+
     current_player = state["players"][player_id]
     max_bet = get_max_bet(state)
     if current_player["committed_by"] < max_bet:
-        current_player["committed_by"] = max_bet
+        if state["game_type"] == "drinking" or state["players_stacks"][player_id] > max_bet:
+            current_player["committed_by"] = max_bet
+        else:
+            current_player["committed_by"] = state["players_stacks"][player_id]
 
     (players_after_current_not_folded,
      players_before_current_not_folded_not_aligned) = determine_next_players_for_this_round(state, player_id)
 
     state["players"][player_id]["state"] = PlayerState.IN_GAME
     event = None
-    if all_players_all_in(state):
+
+    bing_blind_called_and_turn_to_big_blind = (
+        len(players_after_current_not_folded) == 1
+        and state["players"][players_after_current_not_folded[0]]["committed_by"] == state["big_blind"]
+    )
+
+    if all_players_all_in(state) or (all_aligned(state) and not bing_blind_called_and_turn_to_big_blind):
         event = next_state_event(state["game_state"])
     elif players_after_current_not_folded:
         state["players"][players_after_current_not_folded[0]]["state"] = PlayerState.MY_TURN
@@ -628,7 +708,7 @@ def player_call(state, player_id):
     return event, state
 
 
-def best_combination(cards):
+def best_combination(cards) -> Result:
     def get_sequences_in_len_reversed_order(
             ordered_cards,
             are_following_each_other,
@@ -785,20 +865,101 @@ def best_combination(cards):
 def end_game(state):
     state["game_state"] = GameState.GAME_OVER
     state["results"] = generate_end_game_results(state)
+    if state["game_type"] == "normal":
+        return Event.make_event(Event.RESOLVE_STACKS), state
     return None, state
 
 
+def deal_pot(ranking, commits, players_stacks, pot):
+    if pot == 0 or ranking == []:
+        return
+
+    winners_ids = ranking[0]
+
+    smallest_winner = sorted(
+        winners_ids,
+        key=lambda w_id: commits[w_id],
+        reverse=True
+    )[0]
+    smallest_winner_commit = commits[smallest_winner]
+
+    smallest_winner_pot = 0
+    for _ in commits:  # Read "for _ in players" but we don't have access to players here
+        pot_pull = smallest_winner_commit if smallest_winner_commit <= pot else pot
+        pot = pot - pot_pull
+        smallest_winner_pot = smallest_winner_pot + min(smallest_winner_commit, pot_pull)
+
+    for winner_id in winners_ids:
+        players_stacks[winner_id] += int(smallest_winner_pot/len(winners_ids))
+
+    ranking[0].remove(smallest_winner)
+    del commits[smallest_winner]
+    if not ranking[0]:
+        ranking = ranking[1:]
+    deal_pot(
+        ranking,
+        commits,
+        players_stacks,
+        pot
+    )
+
+
+def resolve_stacks(state):
+    if state["game_state"] != GameState.GAME_OVER:
+        raise EventRejected("Trying to resolve stacks for a game that is not over")
+
+    players = state["players"]
+    players_stacks = state["players_stacks"]
+    for player_id in players:
+        players_stacks[player_id] -= players[player_id]["committed_by"]
+
+    # Now deal the pot
+    pot = sum(players[player_id]["committed_by"] for player_id in players)
+    commits = {
+        player_id: players[player_id]["committed_by"]
+        for player_id in players
+        if "committed_by" in players[player_id]
+    }
+
+    deal_pot(copy.deepcopy(state["results"]["ranking"]), commits, players_stacks, pot)
+
+    players_at_0_stack = [player_id for player_id in players if players_stacks[player_id] == 0]
+
+    return (
+        ({"type": Event.PLAYERS_LOST, "players_ids": players_at_0_stack}
+         if players_at_0_stack
+         else None),
+        state
+    )
+
+
+def get_raise_limit(state, player_id):
+    if state["game_type"] == "normal":
+        return state["players_stacks"][player_id]
+    else:
+        return state["all_in"]
+
+
 def player_raise(state, player_id, amount):
+
+    def committed_by_or_0():
+        if "committed_by" in state["players"][player_id]:
+            return state["players"][player_id]["committed_by"]
+        else:
+            return 0
+
+    new_committed_by = amount if state["game_type"] != "normal" else (amount + committed_by_or_0())
+
     if player_id not in state["players"]:
         raise EventRejected(f"Unknown player {player_id} trying to raise")
     elif state["players"][player_id]["state"] != PlayerState.MY_TURN:
         raise EventRejected(f"Player {player_id} trying to raise while not their turn")
-    elif amount < get_max_bet(state):
+    elif new_committed_by <= get_max_bet(state):
         raise EventRejected(f"Player {player_id} trying to raise under max bet")
-    elif amount > state["all_in"]:
+    elif new_committed_by > get_raise_limit(state, player_id):
         raise EventRejected(f"Player {player_id} trying to raise over limit")
 
-    state["players"][player_id]["committed_by"] = amount
+    state["players"][player_id]["committed_by"] = new_committed_by
 
     (players_after_current_not_folded,
      players_before_current_not_folded_not_aligned) = determine_next_players_for_this_round(state, player_id)
@@ -820,7 +981,32 @@ def show_cards(state, player_id):
     return None, state
 
 
+def players_lost(state, players_ids: List[str]):
+    # reset stacks of losers
+    for looser_id in players_ids:
+        state["players_stacks"][looser_id] = 1000
+    return (
+        {
+            "type": Event.MULTI_EVENT,
+            "events": [
+                {"type": Event.PLAYER_LEAVE,
+                 "player_id": looser_id}
+                for looser_id in players_ids
+            ]
+        },
+        state
+    )
+
+
 def process_event(state, event):
+    """
+    Event loop.
+    Event are processed, and if the processing of an event generates an event, then it is processed too before
+    returning to the caller (recursive).
+    Note that it processes MULTI_EVENTs, which combines one or more events, in a list. In that case itill process the
+    first event of the list, and all the events it generates, then move on to processing the second and all the events
+    the processing generates, then ...
+    """
     if event["type"] == Event.PLAYER_SIT:
         event, new_state = sit_player(
             state,
@@ -874,6 +1060,15 @@ def process_event(state, event):
             state,
             event["player_id"]
         )
+    elif event["type"] == Event.RESOLVE_STACKS:
+        event, new_state = resolve_stacks(state)
+    elif event["type"] == Event.PLAYERS_LOST:
+        event, new_state = players_lost(state, event["players_ids"])
+    elif event["type"] == Event.MULTI_EVENT:
+        new_state = state
+        for one_event in event["events"]:
+            new_state = process_event(new_state, one_event)
+        event = None
     else:
         print(f"WARNING: unknown event type: {event['type']}")
         event, new_state = None, state
