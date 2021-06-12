@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 
 import os
 
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -19,11 +20,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '@$4l!ltb&sk_xhvl7&i9j9pm#gxj29nsny=g5q#w!uixg^)(o#'
 
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+
 
 ALLOWED_HOSTS = [
     "obscure-shore-25002.herokuapp.com",
@@ -34,14 +38,15 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
+    'drunkpoker.main',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'channels',
-    'drunkpoker.main'
+    'django_extensions'
 ]
 
 MIDDLEWARE = [
@@ -74,7 +79,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'drunkpoker.wsgi.application'
 
-SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
 
 DATABASES = {
     'default': {
@@ -119,14 +123,16 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
-
 STATIC_URL = '/static/'
+
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static")
 ]
 
-ASGI_APPLICATION = "drunkpoker.routing.application"
+
+ASGI_APPLICATION = "drunkpoker.asgi.application"
+
 
 CHANNEL_LAYERS = {
     "default": {
@@ -134,7 +140,11 @@ CHANNEL_LAYERS = {
     }
 }
 
+
 ELM_APP_DIR = os.path.join(BASE_DIR, 'drunkpoker', 'main', 'frontend')
+
+
+SESSION_SAVE_EVERY_REQUEST = True
 
 
 if 'DATABASE_URL' in os.environ:

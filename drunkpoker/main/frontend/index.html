@@ -10,7 +10,7 @@
             margin: 0;
         }
     </style>
-    <link rel="shortcut icon" type="image/png" href="static/favicon.ico"/>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <script type="text/javascript" src="../../elm.js"></script>
 </head>
 
@@ -25,20 +25,25 @@ var app = Elm.Main.init({
 	node: document.getElementById('myapp')
 });
 
-// Create your WebSocket.
-var socket = new WebSocket(
-    (window.location.protocol === "https:" ? 'wss://' : 'ws://')
-    + window.location.host
-    + '/ws/table/<TABLE_NAME>');
+var socket;
 
-app.ports.tableNameReceiver.send(
-    window.location.origin
-    + "/table/<TABLE_NAME>");
+app.ports.connectSocket.subscribe(function(tableKey) {
+    console.log("Trying to connect with table key: " + tableKey);
+    if (tableKey) {
+        var parsedKey = JSON.parse(tableKey);
 
-// When a message comes into our WebSocket, we pass the message along
-// to the `messageReceiver` port.
-socket.addEventListener("message", function(event) {
-	app.ports.messageReceiver.send(event.data);
+        socket = new WebSocket(
+            (window.location.protocol === "https:" ? 'wss://' : 'ws://')
+            + window.location.host
+            + '/ws/'
+            + parsedKey.tableType
+            + 'table/'
+            + parsedKey.tableName);
+
+        socket.addEventListener("message", function(event) {
+            app.ports.messageReceiver.send(event.data);
+        });
+    }
 });
 
 // If you want to use a JavaScript library to manage your WebSocket
