@@ -18,33 +18,39 @@ def get_host(headers):
 class BootstrapElm(AsyncHttpConsumer):
 
     async def handle(self, body):
-        print(f'New player joining')
-        await database_sync_to_async(self.scope["session"].save)()
-        if "table_name" in self.scope["url_route"]["kwargs"]:
-            pass
-        with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:
-            reply = f.read()
-        await self.send_response(
-            200,
-            bytes(reply, encoding="utf-8"),
-            headers=[
-                (b"Content-Type", b"text/html")
-            ]
-        )
+        try:
+            print(f'New player joining')
+            await database_sync_to_async(self.scope["session"].save)()
+            if "table_name" in self.scope["url_route"]["kwargs"]:
+                pass
+            with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:
+                reply = f.read()
+            await self.send_response(
+                200,
+                bytes(reply, encoding="utf-8"),
+                headers=[
+                    (b"Content-Type", b"text/html")
+                ]
+            )
+        except Exception as e:
+            print(e)
 
 
 class ElmApp(AsyncHttpConsumer):
 
     async def handle(self, body):
-        with open(os.path.join(settings.ELM_APP_DIR, 'elm.js')) as f:
-            reply = f.read()
-        await self.send_response(
-            200,
-            bytes(reply, encoding="utf-8"),
-            headers=[
-                (b"Content-Type", b"text/javascript")
-            ]
-        )
+        try:
+            with open(os.path.join(settings.ELM_APP_DIR, 'elm.js')) as f:
+                reply = f.read()
+            await self.send_response(
+                200,
+                bytes(reply, encoding="utf-8"),
+                headers=[
+                    (b"Content-Type", b"text/javascript")
+                ]
+            )
+        except Exception as e:
+            print(e)
 
 
 class PlayerActions(AsyncHttpConsumer):
