@@ -1,11 +1,18 @@
 from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.exceptions import AcceptConnection, DenyConnection, StopConsumer
 from django.conf import settings
 import drunkpoker.main.state as persistent_state
 import drunkpoker.main.engine as engine
 import os
 import json
+import functools
+import logging
+import inspect
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_host(headers):
@@ -15,44 +22,70 @@ def get_host(headers):
     return ''
 
 
+def log_exceptions(f):
+
+    @functools.wraps(f)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await f(*args, **kwargs)
+        except (AcceptConnection, DenyConnection, StopConsumer):
+            raise
+        except Exception as exception:
+            if not getattr(exception, "logged_by_wrapper", False):
+                logger.error(
+                    "Unhandled exception occurred in {}:".format(f.__qualname__),
+                    exc_info=exception,
+                )
+                setattr(exception, "logged_by_wrapper", True)
+            raise
+
+    return wrapper
+
+
+def log_consumer_exceptions(cls):
+
+    for method_name, method in list(cls.__dict__.items()):
+        if inspect.iscoroutinefunction(method):
+            setattr(cls, method_name, log_exceptions(method))
+
+    return cls
+
+
+@log_consumer_exceptions
 class BootstrapElm(AsyncHttpConsumer):
 
     async def handle(self, body):
-        try:
-            print(f'New player joining')
-            await database_sync_to_async(self.scope["session"].save)()
-            if "table_name" in self.scope["url_route"]["kwargs"]:
-                pass
-            with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:
-                reply = f.read()
-            await self.send_response(
-                200,
-                bytes(reply, encoding="utf-8"),
-                headers=[
-                    (b"Content-Type", b"text/html")
-                ]
-            )
-        except Exception as e:
-            print(e)
+        print(f'New player joining')
+        await database_sync_to_async(self.scope["session"].save)()
+        if "table_name" in self.scope["url_route"]["kwargs"]:
+            pass
+        with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:
+            reply = f.read()
+        await self.send_response(
+            200,
+            bytes(reply, encoding="utf-8"),
+            headers=[
+                (b"Content-Type", b"text/html")
+            ]
+        )
 
 
+@log_consumer_exceptions
 class ElmApp(AsyncHttpConsumer):
 
     async def handle(self, body):
-        try:
-            with open(os.path.join(settings.ELM_APP_DIR, 'elm.js')) as f:
-                reply = f.read()
-            await self.send_response(
-                200,
-                bytes(reply, encoding="utf-8"),
-                headers=[
-                    (b"Content-Type", b"text/javascript")
-                ]
-            )
-        except Exception as e:
-            print(e)
+        with open(os.path.join(settings.ELM_APP_DIR, 'elm.js')) as f:
+            reply = f.read()
+        await self.send_response(
+            200,
+            bytes(reply, encoding="utf-8"),
+            headers=[
+                (b"Content-Type", b"text/javascript")
+            ]
+        )
 
 
+@log_consumer_exceptions
 class PlayerActions(AsyncHttpConsumer):
 
     EVENT_TYPE_FROM_URL_ACTION = {
@@ -113,6 +146,7 @@ class PlayerActions(AsyncHttpConsumer):
         )
 
 
+@log_consumer_exceptions
 class StreamGameState(AsyncWebsocketConsumer):
 
     async def connect(self):
