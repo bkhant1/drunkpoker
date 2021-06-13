@@ -56,7 +56,12 @@ class BootstrapElm(AsyncHttpConsumer):
 
     async def handle(self, body):
         print(f'New player joining')
-        await database_sync_to_async(self.scope["session"].save)()
+
+        # def set_dummy_session_attribute():
+        #     self.scope["session"]["dummy"] = "dummy"
+        #
+        # await database_sync_to_async(set_dummy_session_attribute)()
+        # await database_sync_to_async(self.scope["session"].save)()
         if "table_name" in self.scope["url_route"]["kwargs"]:
             pass
         with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:

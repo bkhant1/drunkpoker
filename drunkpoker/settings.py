@@ -144,9 +144,6 @@ CHANNEL_LAYERS = {
 ELM_APP_DIR = os.path.join(BASE_DIR, 'drunkpoker', 'main', 'frontend')
 
 
-SESSION_SAVE_EVERY_REQUEST = True
-
-
 if 'DATABASE_URL' in os.environ:
     import dj_database_url
     DATABASES = {'default': dj_database_url.config()}
