@@ -2,6 +2,7 @@ from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.exceptions import AcceptConnection, DenyConnection, StopConsumer
+from django.contrib.sessions.backends.db import CreateError
 from django.conf import settings
 import drunkpoker.main.state as persistent_state
 import drunkpoker.main.engine as engine
@@ -57,11 +58,14 @@ class BootstrapElm(AsyncHttpConsumer):
     async def handle(self, body):
         print(f'New player joining')
 
-        # def set_dummy_session_attribute():
-        #     self.scope["session"]["dummy"] = "dummy"
-        #
+        def save_session():
+            try:
+                self.scope["session"].save(must_create=True)
+            except CreateError:
+                self.scope["session"].save(must_create=False)
+
         # await database_sync_to_async(set_dummy_session_attribute)()
-        # await database_sync_to_async(self.scope["session"].save)()
+        await database_sync_to_async(save_session)()
         if "table_name" in self.scope["url_route"]["kwargs"]:
             pass
         with open(os.path.join(settings.ELM_APP_DIR, 'index.html')) as f:
