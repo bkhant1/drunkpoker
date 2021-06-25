@@ -531,9 +531,11 @@ theme =
     , cardBlack = rgb 0 0 0
     , other = rgb 217 217 217 -- rgb 69 73 85
     , tableGreen = rgb 114 176 29
+    , tableShade = rgb 72 112 18
     , buttonBlue = rgb 77 189 219
     , buttonGrey = rgb 140 140 140
     , fontSizeButtons = Css.fontSize <| Css.pct 160
+    , fontSizePlayerDisplay = Css.fontSize <| Css.px 24
     , fontWeightButtons = Css.fontWeight Css.bold
     }
 
@@ -669,6 +671,7 @@ renderCardWithSize cardTopVhPos cardLeftVwPos size url =
             Css.batch
             [ Css.width (Css.vw <| cardProportion*cardHeight)
             , Css.height (Css.vh <| cardHeight)
+            , Css.zIndex <| Css.int 1
             ]
     in
     div
@@ -708,7 +711,7 @@ renderPlayer model player position mySeatNumber =
         cardsOffset = 1
         backCardUrl = model.hostName ++ "/static/cards/1B.svg"
         font = Css.batch
-            [ theme.fontSizeButtons
+            [ theme.fontSizePlayerDisplay
             , theme.fontWeightButtons
             , Css.color theme.cardWhite
             ]
@@ -742,11 +745,7 @@ renderPlayer model player position mySeatNumber =
         renderStack =
             [ div
                 [ css
-                    [ font
-                    , Css.position Css.relative
-                    , Css.top (Css.vh <| -9)
-                    , Css.left (Css.vw <| -3.2)
-                    ]
+                    [ font ]
                 ]
                 [ text <| Maybe.withDefault "" (Maybe.map String.fromInt getStack) ]
             ]
@@ -754,11 +753,7 @@ renderPlayer model player position mySeatNumber =
             let committedByText = Maybe.withDefault "" (Maybe.map String.fromInt getCommittedBy) in
             [ div
                 [ css
-                    [ font
-                    , Css.position Css.relative
-                    , Css.top (Css.vh <| -9 ) --+ Tuple.first committedByOffset)
-                    , Css.left (Css.vw <| 0 ) --+ Tuple.second committedByOffset)
-                    ]
+                    [ font ]
                 ]
                 [ text <| if committedByText /= "0" then committedByText else "" ]
             ]
@@ -766,13 +761,27 @@ renderPlayer model player position mySeatNumber =
         renderName =
             [ div
                 [ css
-                    [ font
-                    , Css.position Css.relative
-                    , Css.top (Css.vh <| -9 ) --+ Tuple.first committedByOffset)
-                    , Css.left (Css.vw <| -3.2 ) --+ Tuple.second committedByOffset)
-                    ]
+                    [ font ]
                 ]
                 [ text <| String.left 8 player.name ]
+            ]
+        renderStackNameAndCommittedBy =
+            [ div
+                [ css
+                  [ Css.height <| Css.px 62
+                  , Css.width <| Css.px 100
+                  , Css.backgroundColor <| theme.tableShade
+                  , Css.padding4 (Css.px 4) (Css.px 0) (Css.px 0) (Css.px 6)
+                  , Css.opacity <| Css.num 0.8
+                  , Css.border3 (Css.px 0) Css.solid (Css.rgb 11 14 17)
+                  , Css.borderRadius <| Css.px 5
+                  , Css.position Css.absolute
+                  , Css.top <| Css.vh 12.5
+                  , Css.left <| Css.vw -3.2
+                  , Css.zIndex <| Css.int -1
+                  ]
+                ]
+                <| renderCommittedBy ++ renderStack ++ renderName
             ]
         renderCards: Maybe (Card, Card) -> List (Html Msg)
         renderCards cards =
@@ -793,8 +802,6 @@ renderPlayer model player position mySeatNumber =
     div
         [ css
             [ playerPositionCss <| offsetPosition position avatarOffset
-            , Css.width <| Css.vw 0
-            , Css.height <| Css.vh 0
             , Css.zIndex (Css.int 1)
             ]
         ]
@@ -812,6 +819,7 @@ renderPlayer model player position mySeatNumber =
                  , css
                      [ Css.height (Css.pct 100)
                      , Css.width (Css.pct 100)
+                     , Css.zIndex <| Css.int -2
                      ]
                  ]
                  []
@@ -819,9 +827,7 @@ renderPlayer model player position mySeatNumber =
         ]
         ++ renderGlow
         ++ renderCards player.cards
-        ++ renderStack
-        ++ renderCommittedBy
-        ++ renderName
+        ++ renderStackNameAndCommittedBy
         )
 
 
@@ -855,6 +861,7 @@ pot: Model -> List (Html Msg)
 pot model =
     let
         thePot = 1
+        shouldDisplay = Debug.log "hey: " <| model.tableType == Normal
     in
     [ div
         [ css
@@ -866,8 +873,9 @@ pot model =
             , Css.color theme.cardWhite
             ]
         ]
-        [ text <| if thePot > 0 then "Pot: " ++ String.fromInt thePot else "" ]
+        [ text <| if thePot > 0 && shouldDisplay then "Pot: " ++ String.fromInt thePot else "" ]
     ]
+
 
 communityCards: Model -> List (Html Msg)
 communityCards model =
@@ -1151,9 +1159,9 @@ view model =
   div [ css
             [ Css.zIndex <| Css.int 1
             , Css.backgroundColor theme.other
-            , Css.flex Css.none
             , Css.width <| Css.pct 100
             , Css.height <| Css.pct 100
+            , Css.position Css.relative
             ]
       ]
       (playerSits model

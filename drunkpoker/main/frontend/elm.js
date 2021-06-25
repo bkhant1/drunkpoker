@@ -9699,9 +9699,12 @@ var $author$project$Table$theme = {
 	cardWhite: A3($rtfeldman$elm_css$Css$rgb, 255, 255, 255),
 	fontSizeButtons: $rtfeldman$elm_css$Css$fontSize(
 		$rtfeldman$elm_css$Css$pct(160)),
+	fontSizePlayerDisplay: $rtfeldman$elm_css$Css$fontSize(
+		$rtfeldman$elm_css$Css$px(24)),
 	fontWeightButtons: $rtfeldman$elm_css$Css$fontWeight($rtfeldman$elm_css$Css$bold),
 	other: A3($rtfeldman$elm_css$Css$rgb, 217, 217, 217),
-	tableGreen: A3($rtfeldman$elm_css$Css$rgb, 114, 176, 29)
+	tableGreen: A3($rtfeldman$elm_css$Css$rgb, 114, 176, 29),
+	tableShade: A3($rtfeldman$elm_css$Css$rgb, 72, 112, 18)
 };
 var $rtfeldman$elm_css$Css$VhUnits = {$: 'VhUnits'};
 var $rtfeldman$elm_css$Css$vh = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$VhUnits, 'vh');
@@ -10198,7 +10201,9 @@ var $author$project$Table$renderCardWithSize = F4(
 						$rtfeldman$elm_css$Css$width(
 						$rtfeldman$elm_css$Css$vw(cardProportion * cardHeight)),
 						$rtfeldman$elm_css$Css$height(
-						$rtfeldman$elm_css$Css$vh(cardHeight))
+						$rtfeldman$elm_css$Css$vh(cardHeight)),
+						$rtfeldman$elm_css$Css$zIndex(
+						$rtfeldman$elm_css$Css$int(1))
 					]));
 		}();
 		return A2(
@@ -10665,6 +10670,18 @@ var $author$project$Table$renderEmptySit = F3(
 		}
 	});
 var $rtfeldman$elm_css$Css$border = $rtfeldman$elm_css$Css$prop1('border');
+var $rtfeldman$elm_css$Css$prop3 = F4(
+	function (key, argA, argB, argC) {
+		return A2(
+			$rtfeldman$elm_css$Css$property,
+			key,
+			A2(
+				$elm$core$String$join,
+				' ',
+				_List_fromArray(
+					[argA.value, argB.value, argC.value])));
+	});
+var $rtfeldman$elm_css$Css$border3 = $rtfeldman$elm_css$Css$prop3('border');
 var $rtfeldman$elm_css$Css$prop5 = F6(
 	function (key, argA, argB, argC, argD, argE) {
 		return A2(
@@ -11058,6 +11075,19 @@ var $elm$core$Maybe$map2 = F3(
 			}
 		}
 	});
+var $rtfeldman$elm_css$Css$UnitlessFloat = {$: 'UnitlessFloat'};
+var $rtfeldman$elm_css$Css$num = function (val) {
+	return {
+		lengthOrNumber: $rtfeldman$elm_css$Css$Structure$Compatible,
+		lengthOrNumberOrAutoOrNoneOrContent: $rtfeldman$elm_css$Css$Structure$Compatible,
+		number: $rtfeldman$elm_css$Css$Structure$Compatible,
+		numberOrInfinite: $rtfeldman$elm_css$Css$Structure$Compatible,
+		numericValue: val,
+		unitLabel: '',
+		units: $rtfeldman$elm_css$Css$UnitlessFloat,
+		value: $elm$core$String$fromFloat(val)
+	};
+};
 var $author$project$Table$Position = F2(
 	function (pctTop, pctLeft) {
 		return {pctLeft: pctLeft, pctTop: pctTop};
@@ -11070,11 +11100,25 @@ var $author$project$Table$offsetPosition = F2(
 		var offsetLeft = _v1.b;
 		return A2($author$project$Table$Position, pctTop + offsetTop, pctLeft + offsetLeft);
 	});
+var $rtfeldman$elm_css$Css$opacity = $rtfeldman$elm_css$Css$prop1('opacity');
+var $rtfeldman$elm_css$Css$prop4 = F5(
+	function (key, argA, argB, argC, argD) {
+		return A2(
+			$rtfeldman$elm_css$Css$property,
+			key,
+			A2(
+				$elm$core$String$join,
+				' ',
+				_List_fromArray(
+					[argA.value, argB.value, argC.value, argD.value])));
+	});
+var $rtfeldman$elm_css$Css$padding4 = $rtfeldman$elm_css$Css$prop4('padding');
 var $rtfeldman$elm_css$Css$relative = {position: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'relative'};
 var $author$project$Table$renderPlayerCard = F3(
 	function (cardTopVhPos, cardLeftVwPos, url) {
 		return A4($author$project$Table$renderCardWithSize, cardTopVhPos, cardLeftVwPos, 12, url);
 	});
+var $rtfeldman$elm_css$Css$solid = {borderStyle: $rtfeldman$elm_css$Css$Structure$Compatible, textDecorationStyle: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'solid'};
 var $author$project$Table$renderPlayer = F4(
 	function (model, player, position, mySeatNumber) {
 		var renderGlow = function () {
@@ -11139,7 +11183,7 @@ var $author$project$Table$renderPlayer = F4(
 		var font = $rtfeldman$elm_css$Css$batch(
 			_List_fromArray(
 				[
-					$author$project$Table$theme.fontSizeButtons,
+					$author$project$Table$theme.fontSizePlayerDisplay,
 					$author$project$Table$theme.fontWeightButtons,
 					$rtfeldman$elm_css$Css$color($author$project$Table$theme.cardWhite)
 				]));
@@ -11156,14 +11200,7 @@ var $author$project$Table$renderPlayer = F4(
 						[
 							$rtfeldman$elm_css$Html$Styled$Attributes$css(
 							_List_fromArray(
-								[
-									font,
-									$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$relative),
-									$rtfeldman$elm_css$Css$top(
-									$rtfeldman$elm_css$Css$vh(-9)),
-									$rtfeldman$elm_css$Css$left(
-									$rtfeldman$elm_css$Css$vw(0))
-								]))
+								[font]))
 						]),
 					_List_fromArray(
 						[
@@ -11180,14 +11217,7 @@ var $author$project$Table$renderPlayer = F4(
 					[
 						$rtfeldman$elm_css$Html$Styled$Attributes$css(
 						_List_fromArray(
-							[
-								font,
-								$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$relative),
-								$rtfeldman$elm_css$Css$top(
-								$rtfeldman$elm_css$Css$vh(-9)),
-								$rtfeldman$elm_css$Css$left(
-								$rtfeldman$elm_css$Css$vw(-3.2))
-							]))
+							[font]))
 					]),
 				_List_fromArray(
 					[
@@ -11203,14 +11233,7 @@ var $author$project$Table$renderPlayer = F4(
 					[
 						$rtfeldman$elm_css$Html$Styled$Attributes$css(
 						_List_fromArray(
-							[
-								font,
-								$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$relative),
-								$rtfeldman$elm_css$Css$top(
-								$rtfeldman$elm_css$Css$vh(-9)),
-								$rtfeldman$elm_css$Css$left(
-								$rtfeldman$elm_css$Css$vw(-3.2))
-							]))
+							[font]))
 					]),
 				_List_fromArray(
 					[
@@ -11220,6 +11243,48 @@ var $author$project$Table$renderPlayer = F4(
 							'',
 							A2($elm$core$Maybe$map, $elm$core$String$fromInt, getStack)))
 					]))
+			]);
+		var renderStackNameAndCommittedBy = _List_fromArray(
+			[
+				A2(
+				$rtfeldman$elm_css$Html$Styled$div,
+				_List_fromArray(
+					[
+						$rtfeldman$elm_css$Html$Styled$Attributes$css(
+						_List_fromArray(
+							[
+								$rtfeldman$elm_css$Css$height(
+								$rtfeldman$elm_css$Css$px(62)),
+								$rtfeldman$elm_css$Css$width(
+								$rtfeldman$elm_css$Css$px(100)),
+								$rtfeldman$elm_css$Css$backgroundColor($author$project$Table$theme.tableShade),
+								A4(
+								$rtfeldman$elm_css$Css$padding4,
+								$rtfeldman$elm_css$Css$px(4),
+								$rtfeldman$elm_css$Css$px(0),
+								$rtfeldman$elm_css$Css$px(0),
+								$rtfeldman$elm_css$Css$px(6)),
+								$rtfeldman$elm_css$Css$opacity(
+								$rtfeldman$elm_css$Css$num(0.8)),
+								A3(
+								$rtfeldman$elm_css$Css$border3,
+								$rtfeldman$elm_css$Css$px(0),
+								$rtfeldman$elm_css$Css$solid,
+								A3($rtfeldman$elm_css$Css$rgb, 11, 14, 17)),
+								$rtfeldman$elm_css$Css$borderRadius(
+								$rtfeldman$elm_css$Css$px(5)),
+								$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute),
+								$rtfeldman$elm_css$Css$top(
+								$rtfeldman$elm_css$Css$vh(12.5)),
+								$rtfeldman$elm_css$Css$left(
+								$rtfeldman$elm_css$Css$vw(-3.2)),
+								$rtfeldman$elm_css$Css$zIndex(
+								$rtfeldman$elm_css$Css$int(-1))
+							]))
+					]),
+				_Utils_ap(
+					renderCommittedBy,
+					_Utils_ap(renderStack, renderName)))
 			]);
 		var cardsTop = 6;
 		var cardsOffset = 1;
@@ -11283,10 +11348,6 @@ var $author$project$Table$renderPlayer = F4(
 						[
 							$author$project$Table$playerPositionCss(
 							A2($author$project$Table$offsetPosition, position, avatarOffset)),
-							$rtfeldman$elm_css$Css$width(
-							$rtfeldman$elm_css$Css$vw(0)),
-							$rtfeldman$elm_css$Css$height(
-							$rtfeldman$elm_css$Css$vh(0)),
 							$rtfeldman$elm_css$Css$zIndex(
 							$rtfeldman$elm_css$Css$int(1))
 						]))
@@ -11326,7 +11387,9 @@ var $author$project$Table$renderPlayer = F4(
 												$rtfeldman$elm_css$Css$height(
 												$rtfeldman$elm_css$Css$pct(100)),
 												$rtfeldman$elm_css$Css$width(
-												$rtfeldman$elm_css$Css$pct(100))
+												$rtfeldman$elm_css$Css$pct(100)),
+												$rtfeldman$elm_css$Css$zIndex(
+												$rtfeldman$elm_css$Css$int(-2))
 											]))
 									]),
 								_List_Nil)
@@ -11336,9 +11399,7 @@ var $author$project$Table$renderPlayer = F4(
 					renderGlow,
 					_Utils_ap(
 						renderCards(player.cards),
-						_Utils_ap(
-							renderStack,
-							_Utils_ap(renderCommittedBy, renderName))))));
+						renderStackNameAndCommittedBy))));
 	});
 var $author$project$Table$playerSit = F3(
 	function (model, position, seatNumber) {
@@ -11393,6 +11454,10 @@ var $author$project$Table$playerSits = function (model) {
 };
 var $author$project$Table$pot = function (model) {
 	var thePot = 1;
+	var shouldDisplay = A2(
+		$elm$core$Debug$log,
+		'hey: ',
+		_Utils_eq(model.tableType, $author$project$Table$Normal));
 	return _List_fromArray(
 		[
 			A2(
@@ -11415,7 +11480,7 @@ var $author$project$Table$pot = function (model) {
 			_List_fromArray(
 				[
 					$rtfeldman$elm_css$Html$Styled$text(
-					(thePot > 0) ? ('Pot: ' + $elm$core$String$fromInt(thePot)) : '')
+					((thePot > 0) && shouldDisplay) ? ('Pot: ' + $elm$core$String$fromInt(thePot)) : '')
 				]))
 		]);
 };
@@ -11672,11 +11737,11 @@ var $author$project$Table$view = function (model) {
 						$rtfeldman$elm_css$Css$zIndex(
 						$rtfeldman$elm_css$Css$int(1)),
 						$rtfeldman$elm_css$Css$backgroundColor($author$project$Table$theme.other),
-						$rtfeldman$elm_css$Css$flex($rtfeldman$elm_css$Css$none),
 						$rtfeldman$elm_css$Css$width(
 						$rtfeldman$elm_css$Css$pct(100)),
 						$rtfeldman$elm_css$Css$height(
-						$rtfeldman$elm_css$Css$pct(100))
+						$rtfeldman$elm_css$Css$pct(100)),
+						$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$relative)
 					]))
 			]),
 		_Utils_ap(
