@@ -15,7 +15,6 @@ import Svg.Styled.Attributes exposing (cx, cy, fill, rx, ry)
 -- elm-live --no-server --port 1234 --no-server src/Main.elm -- src/Main.elm --output=elm.js
 
 
-
 -- PORTS
 
 port connectSocket : String -> Cmd msg
@@ -184,14 +183,14 @@ realInit tableUrl tableType =
         , results = Nothing
         }
       , playerName = ""
-      , baseUrl = Debug.log "baseUrl: " tableUrl
+      , baseUrl = tableUrl
       , seated = Not
-      , hostName = Debug.log "hostName: " <| getHostName tableUrl
+      , hostName = getHostName tableUrl
       , preparingRaise = Nothing
       , tableType = tableType
       }
     , case getTableName tableUrl of
-        Just tableName ->  -- TODO: that json could be better encoded
+        Just tableName ->
             connectSocket <|
                 "{\"tableName\":\""
                 ++ tableName
@@ -420,7 +419,7 @@ gameStateFromJsonState jsonState =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model = --Debug.log "The state: " <|
+update msg model =
     let
         postAction action =
             Http.post
@@ -434,9 +433,9 @@ update msg model = --Debug.log "The state: " <|
     in
     case msg of
         Receive message ->
-            case D.decodeString jsonStateDecoder <| Debug.log "The message: " message of
+            case D.decodeString jsonStateDecoder message of
                 Ok gameState ->
-                    ( { model | gameState = gameStateFromJsonState <| Debug.log "The game state: " gameState }
+                    ( { model | gameState = gameStateFromJsonState gameState }
                     , Cmd.none
                     )
                 Err error ->
@@ -519,8 +518,7 @@ update msg model = --Debug.log "The state: " <|
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
-        [ messageReceiver Receive
-        ]
+        [ messageReceiver Receive ]
 
 
 -- VIEW
@@ -534,8 +532,8 @@ theme =
     , tableShade = rgb 72 112 18
     , buttonBlue = rgb 77 189 219
     , buttonGrey = rgb 140 140 140
-    , fontSizeButtons = Css.fontSize <| Css.pct 160
-    , fontSizePlayerDisplay = Css.fontSize <| Css.px 24
+    , fontSizeButtons = Css.fontSize <| Css.vw 2.1
+    , fontSizePlayerDisplay = Css.fontSize <| Css.vw 1.8
     , fontWeightButtons = Css.fontWeight Css.bold
     }
 
@@ -560,7 +558,7 @@ interactCommonCss =
         , Css.borderRadius <| Css.px 13
         , Css.position Css.absolute
         , Css.color theme.cardWhite
-        , Css.fontSize <| Css.pct 160
+        , theme.fontSizeButtons
         , Css.fontWeight Css.bold
         ]
 
@@ -578,8 +576,8 @@ sitButton position seatNumber =
         [ css
             [ interactCommonCss
             , playerPositionCss position
-            , Css.width <| Css.vw 10
-            , Css.height <| Css.vh 7
+            , Css.width <| Css.pct 12
+            , Css.height <| Css.pct 6.5
             ]
         , onClick <| EnterName seatNumber
         ]
@@ -589,8 +587,8 @@ sitButton position seatNumber =
 playerPositionCss: Position -> Css.Style
 playerPositionCss position =
     Css.batch
-        [ Css.top (Css.vh position.pctTop)
-        , Css.left (Css.vw position.pctLeft)
+        [ Css.top (Css.pct position.pctTop)
+        , Css.left (Css.pct position.pctLeft)
         , Css.position Css.absolute
         ]
 
@@ -614,8 +612,8 @@ renderEmptySit model position seatNumber =
                     , css
                           [ interactCommonCss
                           , playerPositionCss position
-                          , Css.width <| Css.vw 10
-                          , Css.height <| Css.vh 7
+                          , Css.width <| Css.pct 12
+                          , Css.height <| Css.pct 6.5
                           ]
                     , on "keydown" (ifIsEnter <| Sit seatNumber)
                     , onInput NameUpdate
@@ -656,30 +654,26 @@ cardToUrl: Model -> Card -> String
 cardToUrl model card = model.hostName ++ "/static/cards/" ++ cardToFilename card ++ ".svg"
 
 
-renderPlayerCard cardTopVhPos cardLeftVwPos url =
-    renderCardWithSize cardTopVhPos cardLeftVwPos 12 url
+renderPlayerCard cardTopPctPos cardLeftPctPos url =
+    renderCardWithSize cardTopPctPos cardLeftPctPos 1 url
 
 
 renderCardWithSize: Float -> Float -> Float -> String -> (Html Msg)
-renderCardWithSize cardTopVhPos cardLeftVwPos size url =
+renderCardWithSize cardTopPctPos cardLeftPctPos size url =
     let
         cardsSize =
-            let
-                cardHeight = size
-                cardProportion = 0.32
-            in
             Css.batch
-            [ Css.width (Css.vw <| cardProportion*cardHeight)
-            , Css.height (Css.vh <| cardHeight)
-            , Css.zIndex <| Css.int 1
-            ]
+                [ Css.width (Css.pct <| 41*size)
+                , Css.height (Css.pct <| 111.1*size)
+                , Css.zIndex <| Css.int 1
+                ]
     in
     div
         [ css
             [ cardsSize
             , Css.position Css.absolute
-            , Css.left (Css.vw cardLeftVwPos)
-            , Css.top (Css.vh cardTopVhPos)
+            , Css.left (Css.pct cardLeftPctPos)
+            , Css.top (Css.pct cardTopPctPos)
             ]
         ]
         [ img
@@ -706,9 +700,9 @@ renderPlayer model player position mySeatNumber =
                 5 -> (1,4)
                 6 -> (0,4)
                 _ -> (0,0)
-        cardsTop = 6
-        cardsLeft = 1.8
-        cardsOffset = 1
+        cardsTop = 60
+        cardsLeft = 20
+        cardsOffset = 10.5
         backCardUrl = model.hostName ++ "/static/cards/1B.svg"
         font = Css.batch
             [ theme.fontSizePlayerDisplay
@@ -728,13 +722,13 @@ renderPlayer model player position mySeatNumber =
                 Playing _ MyTurn ->
                     [ div
                         [ css
-                            [ Css.width <| Css.vw 2
-                            , Css.height <| Css.vh 10
+                            [ Css.width <| Css.pct 40
+                            , Css.height <| Css.pct 80
                             , Css.boxShadow5 (Css.vw 0) (Css.vh 0) (Css.px 40) (Css.vw 3) (Css.hex "FFFA00")
                             , Css.borderRadius <| Css.pct 40
                             , Css.border <| Css.px 0
-                            , Css.top <| Css.vh -4.8
-                            , Css.left <| Css.vw -0.5
+                            , Css.top <| Css.pct -50
+                            , Css.left <| Css.pct -12.5
                             , Css.position Css.absolute
                             , Css.zIndex (Css.int -1)
                             ]
@@ -768,16 +762,16 @@ renderPlayer model player position mySeatNumber =
         renderStackNameAndCommittedBy =
             [ div
                 [ css
-                  [ Css.height <| Css.px 62
-                  , Css.width <| Css.px 100
+                  [ Css.height <| Css.pct 92
+                  , Css.width <| Css.pct 100
                   , Css.backgroundColor <| theme.tableShade
                   , Css.padding4 (Css.px 4) (Css.px 0) (Css.px 0) (Css.px 6)
                   , Css.opacity <| Css.num 0.8
                   , Css.border3 (Css.px 0) Css.solid (Css.rgb 11 14 17)
                   , Css.borderRadius <| Css.px 5
                   , Css.position Css.absolute
-                  , Css.top <| Css.vh 12.5
-                  , Css.left <| Css.vw -3.2
+                  , Css.top <| Css.pct 135.5
+                  , Css.left <| Css.pct -33.6
                   , Css.zIndex <| Css.int -1
                   ]
                 ]
@@ -802,16 +796,18 @@ renderPlayer model player position mySeatNumber =
     div
         [ css
             [ playerPositionCss <| offsetPosition position avatarOffset
+            , Css.width <| Css.pct 10
+            , Css.height <| Css.pct 10
             , Css.zIndex (Css.int 1)
             ]
         ]
         ([ div
             [ css
-                [ Css.width (Css.vw 11)
-                , Css.height (Css.vh 22)
+                [ Css.width (Css.pct <| 12.5*10)
+                , Css.height (Css.pct <| 23*10)
                 , Css.position Css.relative
-                , Css.top (Css.vh <| -10)
-                , Css.left (Css.vw <| -5)
+                , Css.top (Css.pct <| -100)
+                , Css.left (Css.pct <| -55)
                 ]
             ]
             [ img
@@ -861,7 +857,7 @@ pot: Model -> List (Html Msg)
 pot model =
     let
         thePot = 1
-        shouldDisplay = Debug.log "hey: " <| model.tableType == Normal
+        shouldDisplay = model.tableType == Normal
     in
     [ div
         [ css
@@ -880,10 +876,10 @@ pot model =
 communityCards: Model -> List (Html Msg)
 communityCards model =
     let
-        offset = 4.5
+        offset = 5.2
         flopLeft = 37
-        flopTop = 39
-        size = 14
+        flopTop = 41
+        size = 0.125
         flopCards =
             case model.gameState.flop of
                 Just (c1, c2, c3) ->
@@ -1132,7 +1128,7 @@ raiseSlider model =
           , Html.Styled.Attributes.step (String.fromInt <| sliderStep)
           , Html.Styled.Attributes.min (String.fromInt <| minRaiseAmount model)
           , Html.Styled.Attributes.max <| String.fromInt maxAmount
-          , value <| Debug.log "Amount: " stringAmount
+          , value stringAmount
           , onInput UpdateRaiseAmount
           ] []
         , Html.Styled.p
@@ -1154,14 +1150,39 @@ results model =
     []
 
 
-view : Model -> Html Msg
-view model =
+view : Model -> Int -> Int -> Html Msg
+view model windowWidth windowHeight =
+    div
+        [ css
+            [ Css.backgroundColor theme.other
+            , Css.height <| Css.pct 100
+            , Css.width <| Css.pct 100
+            , Css.displayFlex
+            ]
+        ]
+        [viewApp model windowWidth windowHeight]
+
+
+viewApp : Model -> Int -> Int -> Html Msg
+viewApp model windowWidth windowHeight =
+  let
+      appRatioLegacy = 0.5
+      appRatio = appRatioLegacy
+      (wwf, whf) = (toFloat windowWidth, toFloat windowHeight)
+      windowRatio = (whf/wwf)
+      (appWidth, appHeight) =
+          if windowRatio > appRatio then
+              (wwf, wwf*appRatio)
+          else
+              (whf/appRatio, whf)
+  in
   div [ css
             [ Css.zIndex <| Css.int 1
             , Css.backgroundColor theme.other
-            , Css.width <| Css.pct 100
-            , Css.height <| Css.pct 100
+            , Css.width <| Css.px appWidth
+            , Css.height <| Css.px appHeight
             , Css.position Css.relative
+            , Css.margin Css.auto
             ]
       ]
       (playerSits model

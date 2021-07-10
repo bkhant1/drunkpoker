@@ -5344,13 +5344,17 @@ var $elm$core$Basics$composeL = F3(
 			f(x));
 	});
 var $author$project$Table$Drunk = {$: 'Drunk'};
-var $author$project$Main$Model = F6(
-	function (table, route, key, drunkTableName, normalTableName, homeUrl) {
-		return {drunkTableName: drunkTableName, homeUrl: homeUrl, key: key, normalTableName: normalTableName, route: route, table: table};
+var $author$project$Main$Model = F7(
+	function (table, route, key, drunkTableName, normalTableName, homeUrl, windowSize) {
+		return {drunkTableName: drunkTableName, homeUrl: homeUrl, key: key, normalTableName: normalTableName, route: route, table: table, windowSize: windowSize};
 	});
 var $author$project$Main$TableMsg = function (a) {
 	return {$: 'TableMsg', a: a};
 };
+var $author$project$Main$WindowSize = F2(
+	function (width, height) {
+		return {height: height, width: width};
+	});
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $author$project$Table$GameInProgress = {$: 'GameInProgress'};
 var $author$project$Table$Not = {$: 'Not'};
@@ -5504,7 +5508,6 @@ var $author$project$Table$getTableName = A2(
 	$elm$core$Basics$composeL,
 	A2($elm$core$Basics$composeL, $elm$core$List$head, $elm$core$List$reverse),
 	$elm$core$String$split('/'));
-var $elm$core$Debug$log = _Debug_log;
 var $author$project$Table$makeEmptySeat = function (seatNumber) {
 	return _Utils_Tuple2(seatNumber, $elm$core$Maybe$Nothing);
 };
@@ -5513,7 +5516,7 @@ var $author$project$Table$realInit = F2(
 	function (tableUrl, tableType) {
 		return _Utils_Tuple2(
 			{
-				baseUrl: A2($elm$core$Debug$log, 'baseUrl: ', tableUrl),
+				baseUrl: tableUrl,
 				gameState: {
 					flop: $elm$core$Maybe$Nothing,
 					gameState: $author$project$Table$GameInProgress,
@@ -5526,10 +5529,7 @@ var $author$project$Table$realInit = F2(
 							A2($elm$core$List$range, 1, 6))),
 					turn: $elm$core$Maybe$Nothing
 				},
-				hostName: A2(
-					$elm$core$Debug$log,
-					'hostName: ',
-					$author$project$Table$getHostName(tableUrl)),
+				hostName: $author$project$Table$getHostName(tableUrl),
 				playerName: '',
 				preparingRaise: $elm$core$Maybe$Nothing,
 				seated: $author$project$Table$Not,
@@ -5547,6 +5547,7 @@ var $author$project$Table$realInit = F2(
 			}());
 	});
 var $author$project$Table$init = $author$project$Table$realInit;
+var $elm$core$Debug$log = _Debug_log;
 var $elm$core$Platform$Cmd$map = _Platform_map;
 var $author$project$Main$maybeSquarred = function (maybeIt) {
 	if (maybeIt.$ === 'Just') {
@@ -6297,38 +6298,349 @@ var $elm$core$Maybe$withDefault = F2(
 		}
 	});
 var $author$project$Main$init = F3(
-	function (_v0, url, key) {
+	function (wSize, url, key) {
 		var tableKey = $author$project$Main$maybeSquarred(
 			A2(
-				$elm$core$Debug$log,
-				'The url :',
-				A2($elm$url$Url$Parser$parse, $author$project$Main$routeParser, url)));
-		var _v1 = A2(
+				$elm$url$Url$Parser$parse,
+				$author$project$Main$routeParser,
+				A2($elm$core$Debug$log, 'Url: ', url)));
+		var _v0 = A2(
 			$author$project$Table$init,
 			$elm$url$Url$toString(url),
 			A2($elm$core$Maybe$withDefault, $author$project$Table$Drunk, tableKey));
-		var tableModel = _v1.a;
-		var theCmd = _v1.b;
+		var tableModel = _v0.a;
+		var tableCmd = _v0.b;
+		var _v1 = function () {
+			if (wSize.b && wSize.b.b) {
+				var w = wSize.a;
+				var _v3 = wSize.b;
+				var h = _v3.a;
+				return _Utils_Tuple2(w, h);
+			} else {
+				return _Utils_Tuple2(0, 0);
+			}
+		}();
+		var width = _v1.a;
+		var height = _v1.b;
 		return _Utils_Tuple2(
-			A6(
+			A7(
 				$author$project$Main$Model,
 				tableModel,
 				tableKey,
 				key,
 				'',
 				'',
-				$elm$url$Url$toString(url)),
+				$elm$url$Url$toString(url),
+				A2($author$project$Main$WindowSize, width, height)),
 			$elm$core$Platform$Cmd$batch(
 				_List_fromArray(
 					[
-						A2($elm$core$Platform$Cmd$map, $author$project$Main$TableMsg, theCmd)
+						A2($elm$core$Platform$Cmd$map, $author$project$Main$TableMsg, tableCmd)
 					])));
 	});
+var $elm$json$Json$Decode$int = _Json_decodeInt;
+var $elm$json$Json$Decode$list = _Json_decodeList;
+var $author$project$Main$WindowSizeChanged = F2(
+	function (a, b) {
+		return {$: 'WindowSizeChanged', a: a, b: b};
+	});
+var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$core$Platform$Sub$map = _Platform_map;
+var $elm$browser$Browser$Events$Window = {$: 'Window'};
+var $elm$json$Json$Decode$field = _Json_decodeField;
+var $elm$browser$Browser$Events$MySub = F3(
+	function (a, b, c) {
+		return {$: 'MySub', a: a, b: b, c: c};
+	});
+var $elm$browser$Browser$Events$State = F2(
+	function (subs, pids) {
+		return {pids: pids, subs: subs};
+	});
+var $elm$browser$Browser$Events$init = $elm$core$Task$succeed(
+	A2($elm$browser$Browser$Events$State, _List_Nil, $elm$core$Dict$empty));
+var $elm$browser$Browser$Events$nodeToKey = function (node) {
+	if (node.$ === 'Document') {
+		return 'd_';
+	} else {
+		return 'w_';
+	}
+};
+var $elm$browser$Browser$Events$addKey = function (sub) {
+	var node = sub.a;
+	var name = sub.b;
+	return _Utils_Tuple2(
+		_Utils_ap(
+			$elm$browser$Browser$Events$nodeToKey(node),
+			name),
+		sub);
+};
+var $elm$core$Process$kill = _Scheduler_kill;
+var $elm$core$Dict$foldl = F3(
+	function (func, acc, dict) {
+		foldl:
+		while (true) {
+			if (dict.$ === 'RBEmpty_elm_builtin') {
+				return acc;
+			} else {
+				var key = dict.b;
+				var value = dict.c;
+				var left = dict.d;
+				var right = dict.e;
+				var $temp$func = func,
+					$temp$acc = A3(
+					func,
+					key,
+					value,
+					A3($elm$core$Dict$foldl, func, acc, left)),
+					$temp$dict = right;
+				func = $temp$func;
+				acc = $temp$acc;
+				dict = $temp$dict;
+				continue foldl;
+			}
+		}
+	});
+var $elm$core$Dict$merge = F6(
+	function (leftStep, bothStep, rightStep, leftDict, rightDict, initialResult) {
+		var stepState = F3(
+			function (rKey, rValue, _v0) {
+				stepState:
+				while (true) {
+					var list = _v0.a;
+					var result = _v0.b;
+					if (!list.b) {
+						return _Utils_Tuple2(
+							list,
+							A3(rightStep, rKey, rValue, result));
+					} else {
+						var _v2 = list.a;
+						var lKey = _v2.a;
+						var lValue = _v2.b;
+						var rest = list.b;
+						if (_Utils_cmp(lKey, rKey) < 0) {
+							var $temp$rKey = rKey,
+								$temp$rValue = rValue,
+								$temp$_v0 = _Utils_Tuple2(
+								rest,
+								A3(leftStep, lKey, lValue, result));
+							rKey = $temp$rKey;
+							rValue = $temp$rValue;
+							_v0 = $temp$_v0;
+							continue stepState;
+						} else {
+							if (_Utils_cmp(lKey, rKey) > 0) {
+								return _Utils_Tuple2(
+									list,
+									A3(rightStep, rKey, rValue, result));
+							} else {
+								return _Utils_Tuple2(
+									rest,
+									A4(bothStep, lKey, lValue, rValue, result));
+							}
+						}
+					}
+				}
+			});
+		var _v3 = A3(
+			$elm$core$Dict$foldl,
+			stepState,
+			_Utils_Tuple2(
+				$elm$core$Dict$toList(leftDict),
+				initialResult),
+			rightDict);
+		var leftovers = _v3.a;
+		var intermediateResult = _v3.b;
+		return A3(
+			$elm$core$List$foldl,
+			F2(
+				function (_v4, result) {
+					var k = _v4.a;
+					var v = _v4.b;
+					return A3(leftStep, k, v, result);
+				}),
+			intermediateResult,
+			leftovers);
+	});
+var $elm$browser$Browser$Events$Event = F2(
+	function (key, event) {
+		return {event: event, key: key};
+	});
+var $elm$core$Platform$sendToSelf = _Platform_sendToSelf;
+var $elm$browser$Browser$Events$spawn = F3(
+	function (router, key, _v0) {
+		var node = _v0.a;
+		var name = _v0.b;
+		var actualNode = function () {
+			if (node.$ === 'Document') {
+				return _Browser_doc;
+			} else {
+				return _Browser_window;
+			}
+		}();
+		return A2(
+			$elm$core$Task$map,
+			function (value) {
+				return _Utils_Tuple2(key, value);
+			},
+			A3(
+				_Browser_on,
+				actualNode,
+				name,
+				function (event) {
+					return A2(
+						$elm$core$Platform$sendToSelf,
+						router,
+						A2($elm$browser$Browser$Events$Event, key, event));
+				}));
+	});
+var $elm$core$Dict$union = F2(
+	function (t1, t2) {
+		return A3($elm$core$Dict$foldl, $elm$core$Dict$insert, t2, t1);
+	});
+var $elm$browser$Browser$Events$onEffects = F3(
+	function (router, subs, state) {
+		var stepRight = F3(
+			function (key, sub, _v6) {
+				var deads = _v6.a;
+				var lives = _v6.b;
+				var news = _v6.c;
+				return _Utils_Tuple3(
+					deads,
+					lives,
+					A2(
+						$elm$core$List$cons,
+						A3($elm$browser$Browser$Events$spawn, router, key, sub),
+						news));
+			});
+		var stepLeft = F3(
+			function (_v4, pid, _v5) {
+				var deads = _v5.a;
+				var lives = _v5.b;
+				var news = _v5.c;
+				return _Utils_Tuple3(
+					A2($elm$core$List$cons, pid, deads),
+					lives,
+					news);
+			});
+		var stepBoth = F4(
+			function (key, pid, _v2, _v3) {
+				var deads = _v3.a;
+				var lives = _v3.b;
+				var news = _v3.c;
+				return _Utils_Tuple3(
+					deads,
+					A3($elm$core$Dict$insert, key, pid, lives),
+					news);
+			});
+		var newSubs = A2($elm$core$List$map, $elm$browser$Browser$Events$addKey, subs);
+		var _v0 = A6(
+			$elm$core$Dict$merge,
+			stepLeft,
+			stepBoth,
+			stepRight,
+			state.pids,
+			$elm$core$Dict$fromList(newSubs),
+			_Utils_Tuple3(_List_Nil, $elm$core$Dict$empty, _List_Nil));
+		var deadPids = _v0.a;
+		var livePids = _v0.b;
+		var makeNewPids = _v0.c;
+		return A2(
+			$elm$core$Task$andThen,
+			function (pids) {
+				return $elm$core$Task$succeed(
+					A2(
+						$elm$browser$Browser$Events$State,
+						newSubs,
+						A2(
+							$elm$core$Dict$union,
+							livePids,
+							$elm$core$Dict$fromList(pids))));
+			},
+			A2(
+				$elm$core$Task$andThen,
+				function (_v1) {
+					return $elm$core$Task$sequence(makeNewPids);
+				},
+				$elm$core$Task$sequence(
+					A2($elm$core$List$map, $elm$core$Process$kill, deadPids))));
+	});
+var $elm$core$List$maybeCons = F3(
+	function (f, mx, xs) {
+		var _v0 = f(mx);
+		if (_v0.$ === 'Just') {
+			var x = _v0.a;
+			return A2($elm$core$List$cons, x, xs);
+		} else {
+			return xs;
+		}
+	});
+var $elm$core$List$filterMap = F2(
+	function (f, xs) {
+		return A3(
+			$elm$core$List$foldr,
+			$elm$core$List$maybeCons(f),
+			_List_Nil,
+			xs);
+	});
+var $elm$browser$Browser$Events$onSelfMsg = F3(
+	function (router, _v0, state) {
+		var key = _v0.key;
+		var event = _v0.event;
+		var toMessage = function (_v2) {
+			var subKey = _v2.a;
+			var _v3 = _v2.b;
+			var node = _v3.a;
+			var name = _v3.b;
+			var decoder = _v3.c;
+			return _Utils_eq(subKey, key) ? A2(_Browser_decodeEvent, decoder, event) : $elm$core$Maybe$Nothing;
+		};
+		var messages = A2($elm$core$List$filterMap, toMessage, state.subs);
+		return A2(
+			$elm$core$Task$andThen,
+			function (_v1) {
+				return $elm$core$Task$succeed(state);
+			},
+			$elm$core$Task$sequence(
+				A2(
+					$elm$core$List$map,
+					$elm$core$Platform$sendToApp(router),
+					messages)));
+	});
+var $elm$browser$Browser$Events$subMap = F2(
+	function (func, _v0) {
+		var node = _v0.a;
+		var name = _v0.b;
+		var decoder = _v0.c;
+		return A3(
+			$elm$browser$Browser$Events$MySub,
+			node,
+			name,
+			A2($elm$json$Json$Decode$map, func, decoder));
+	});
+_Platform_effectManagers['Browser.Events'] = _Platform_createManager($elm$browser$Browser$Events$init, $elm$browser$Browser$Events$onEffects, $elm$browser$Browser$Events$onSelfMsg, 0, $elm$browser$Browser$Events$subMap);
+var $elm$browser$Browser$Events$subscription = _Platform_leaf('Browser.Events');
+var $elm$browser$Browser$Events$on = F3(
+	function (node, name, decoder) {
+		return $elm$browser$Browser$Events$subscription(
+			A3($elm$browser$Browser$Events$MySub, node, name, decoder));
+	});
+var $elm$browser$Browser$Events$onResize = function (func) {
+	return A3(
+		$elm$browser$Browser$Events$on,
+		$elm$browser$Browser$Events$Window,
+		'resize',
+		A2(
+			$elm$json$Json$Decode$field,
+			'target',
+			A3(
+				$elm$json$Json$Decode$map2,
+				func,
+				A2($elm$json$Json$Decode$field, 'innerWidth', $elm$json$Json$Decode$int),
+				A2($elm$json$Json$Decode$field, 'innerHeight', $elm$json$Json$Decode$int))));
+};
 var $author$project$Table$Receive = function (a) {
 	return {$: 'Receive', a: a};
 };
-var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$json$Json$Decode$string = _Json_decodeString;
 var $author$project$Table$messageReceiver = _Platform_incomingPort('messageReceiver', $elm$json$Json$Decode$string);
 var $author$project$Table$subscriptions = function (_v0) {
@@ -6339,10 +6651,19 @@ var $author$project$Table$subscriptions = function (_v0) {
 			]));
 };
 var $author$project$Main$subscriptions = function (model) {
-	return A2(
-		$elm$core$Platform$Sub$map,
-		$author$project$Main$TableMsg,
-		$author$project$Table$subscriptions(model.table));
+	return $elm$core$Platform$Sub$batch(
+		_List_fromArray(
+			[
+				A2(
+				$elm$core$Platform$Sub$map,
+				$author$project$Main$TableMsg,
+				$author$project$Table$subscriptions(model.table)),
+				$elm$browser$Browser$Events$onResize(
+				F2(
+					function (w, h) {
+						return A2($author$project$Main$WindowSizeChanged, w, h);
+					}))
+			]));
 };
 var $elm$core$List$isEmpty = function (xs) {
 	if (!xs.b) {
@@ -8574,7 +8895,6 @@ var $elm$core$Maybe$isJust = function (maybe) {
 		return false;
 	}
 };
-var $elm$core$Platform$sendToSelf = _Platform_sendToSelf;
 var $elm$core$Basics$composeR = F3(
 	function (f, g, x) {
 		return g(
@@ -8954,7 +9274,6 @@ var $author$project$Table$Card = F2(
 		return {suit: suit, value: value};
 	});
 var $elm$json$Json$Decode$index = _Json_decodeIndex;
-var $elm$json$Json$Decode$int = _Json_decodeInt;
 var $author$project$Table$cardDecoder = A3(
 	$elm$json$Json$Decode$map2,
 	$author$project$Table$Card,
@@ -8967,8 +9286,6 @@ var $elm$json$Json$Decode$dict = function (decoder) {
 		$elm$core$Dict$fromList,
 		$elm$json$Json$Decode$keyValuePairs(decoder));
 };
-var $elm$json$Json$Decode$field = _Json_decodeField;
-var $elm$json$Json$Decode$list = _Json_decodeList;
 var $elm$json$Json$Decode$map3 = _Json_map3;
 var $elm$json$Json$Decode$map5 = _Json_map5;
 var $elm$json$Json$Decode$map6 = _Json_map6;
@@ -9109,7 +9426,6 @@ var $elm$http$Http$State = F2(
 	});
 var $elm$http$Http$init = $elm$core$Task$succeed(
 	A2($elm$http$Http$State, $elm$core$Dict$empty, _List_Nil));
-var $elm$core$Process$kill = _Scheduler_kill;
 var $elm$core$Process$spawn = _Scheduler_spawn;
 var $elm$http$Http$updateReqs = F3(
 	function (router, cmds, reqs) {
@@ -9180,24 +9496,6 @@ var $elm$http$Http$onEffects = F4(
 					A2($elm$http$Http$State, reqs, subs));
 			},
 			A3($elm$http$Http$updateReqs, router, cmds, state.reqs));
-	});
-var $elm$core$List$maybeCons = F3(
-	function (f, mx, xs) {
-		var _v0 = f(mx);
-		if (_v0.$ === 'Just') {
-			var x = _v0.a;
-			return A2($elm$core$List$cons, x, xs);
-		} else {
-			return xs;
-		}
-	});
-var $elm$core$List$filterMap = F2(
-	function (f, xs) {
-		return A3(
-			$elm$core$List$foldr,
-			$elm$core$List$maybeCons(f),
-			_List_Nil,
-			xs);
 	});
 var $elm$http$Http$maybeSend = F4(
 	function (router, desiredTracker, progress, _v0) {
@@ -9293,18 +9591,14 @@ var $author$project$Table$update = F2(
 		switch (msg.$) {
 			case 'Receive':
 				var message = msg.a;
-				var _v1 = A2(
-					$elm$json$Json$Decode$decodeString,
-					$author$project$Table$jsonStateDecoder,
-					A2($elm$core$Debug$log, 'The message: ', message));
+				var _v1 = A2($elm$json$Json$Decode$decodeString, $author$project$Table$jsonStateDecoder, message);
 				if (_v1.$ === 'Ok') {
 					var gameState = _v1.a;
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
 							{
-								gameState: $author$project$Table$gameStateFromJsonState(
-									A2($elm$core$Debug$log, 'The game state: ', gameState))
+								gameState: $author$project$Table$gameStateFromJsonState(gameState)
 							}),
 						$elm$core$Platform$Cmd$none);
 				} else {
@@ -9425,10 +9719,11 @@ var $author$project$Table$update = F2(
 var $author$project$Main$update = F2(
 	function (msg, model) {
 		var goToTable = function (tableType) {
+			var tableName = (tableType === 'normal') ? model.normalTableName : model.drunkTableName;
 			var _v3 = A2(
 				$author$project$Table$init,
-				model.homeUrl + (tableType + ('table/' + model.drunkTableName)),
-				A2($elm$core$Maybe$withDefault, $author$project$Table$Drunk, model.route));
+				model.homeUrl + (tableType + ('table/' + tableName)),
+				(tableType === 'normal') ? $author$project$Table$Normal : $author$project$Table$Drunk);
 			var tableModel = _v3.a;
 			var tableCmd = _v3.b;
 			return _Utils_Tuple2(
@@ -9444,7 +9739,7 @@ var $author$project$Main$update = F2(
 							A2(
 								$elm$url$Url$Builder$absolute,
 								_List_fromArray(
-									[tableType + 'table', model.drunkTableName]),
+									[tableType + 'table', tableName]),
 								_List_Nil)),
 							A2($elm$core$Platform$Cmd$map, $author$project$Main$TableMsg, tableCmd)
 						])));
@@ -9462,10 +9757,7 @@ var $author$project$Main$update = F2(
 					$elm$core$Platform$Cmd$batch(
 						_List_fromArray(
 							[
-								A2(
-								$elm$core$Platform$Cmd$map,
-								$author$project$Main$TableMsg,
-								A2($elm$core$Debug$log, 'cmd: ', theCmd))
+								A2($elm$core$Platform$Cmd$map, $author$project$Main$TableMsg, theCmd)
 							])));
 			case 'SomeUrlChange':
 				var urlRequest = msg.a;
@@ -9512,8 +9804,18 @@ var $author$project$Main$update = F2(
 					$elm$core$Platform$Cmd$none);
 			case 'GoToDrunkTable':
 				return goToTable('drinking');
-			default:
+			case 'GoToNormalTable':
 				return goToTable('normal');
+			default:
+				var w = msg.a;
+				var h = msg.b;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							windowSize: A2($author$project$Main$WindowSize, w, h)
+						}),
+					$elm$core$Platform$Cmd$none);
 		}
 	});
 var $author$project$Main$DrunkTableNameUpdate = function (a) {
@@ -9639,7 +9941,8 @@ var $rtfeldman$elm_css$Css$Preprocess$ApplyStyles = function (a) {
 };
 var $rtfeldman$elm_css$Css$batch = $rtfeldman$elm_css$Css$Preprocess$ApplyStyles;
 var $rtfeldman$elm_css$Css$borderRadius = $rtfeldman$elm_css$Css$prop1('border-radius');
-var $rtfeldman$elm_css$Css$PercentageUnits = {$: 'PercentageUnits'};
+var $rtfeldman$elm_css$Css$position = $rtfeldman$elm_css$Css$prop1('position');
+var $rtfeldman$elm_css$Css$PxUnits = {$: 'PxUnits'};
 var $elm$core$String$fromFloat = _String_fromNumber;
 var $rtfeldman$elm_css$Css$Internal$lengthConverter = F3(
 	function (units, unitLabel, numericValue) {
@@ -9665,9 +9968,6 @@ var $rtfeldman$elm_css$Css$Internal$lengthConverter = F3(
 				unitLabel)
 		};
 	});
-var $rtfeldman$elm_css$Css$pct = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$PercentageUnits, '%');
-var $rtfeldman$elm_css$Css$position = $rtfeldman$elm_css$Css$prop1('position');
-var $rtfeldman$elm_css$Css$PxUnits = {$: 'PxUnits'};
 var $rtfeldman$elm_css$Css$px = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$PxUnits, 'px');
 var $rtfeldman$elm_css$Css$cssFunction = F2(
 	function (funcName, args) {
@@ -9691,6 +9991,8 @@ var $rtfeldman$elm_css$Css$rgb = F3(
 						[r, g, b])))
 		};
 	});
+var $rtfeldman$elm_css$Css$VwUnits = {$: 'VwUnits'};
+var $rtfeldman$elm_css$Css$vw = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$VwUnits, 'vw');
 var $author$project$Table$theme = {
 	buttonBlue: A3($rtfeldman$elm_css$Css$rgb, 77, 189, 219),
 	buttonGrey: A3($rtfeldman$elm_css$Css$rgb, 140, 140, 140),
@@ -9698,9 +10000,9 @@ var $author$project$Table$theme = {
 	cardRed: A3($rtfeldman$elm_css$Css$rgb, 255, 0, 0),
 	cardWhite: A3($rtfeldman$elm_css$Css$rgb, 255, 255, 255),
 	fontSizeButtons: $rtfeldman$elm_css$Css$fontSize(
-		$rtfeldman$elm_css$Css$pct(160)),
+		$rtfeldman$elm_css$Css$vw(2.1)),
 	fontSizePlayerDisplay: $rtfeldman$elm_css$Css$fontSize(
-		$rtfeldman$elm_css$Css$px(24)),
+		$rtfeldman$elm_css$Css$vw(1.8)),
 	fontWeightButtons: $rtfeldman$elm_css$Css$fontWeight($rtfeldman$elm_css$Css$bold),
 	other: A3($rtfeldman$elm_css$Css$rgb, 217, 217, 217),
 	tableGreen: A3($rtfeldman$elm_css$Css$rgb, 114, 176, 29),
@@ -9708,8 +10010,6 @@ var $author$project$Table$theme = {
 };
 var $rtfeldman$elm_css$Css$VhUnits = {$: 'VhUnits'};
 var $rtfeldman$elm_css$Css$vh = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$VhUnits, 'vh');
-var $rtfeldman$elm_css$Css$VwUnits = {$: 'VwUnits'};
-var $rtfeldman$elm_css$Css$vw = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$VwUnits, 'vw');
 var $rtfeldman$elm_css$Css$width = $rtfeldman$elm_css$Css$prop1('width');
 var $author$project$Table$interactCommonCss = $rtfeldman$elm_css$Css$batch(
 	_List_fromArray(
@@ -9723,8 +10023,7 @@ var $author$project$Table$interactCommonCss = $rtfeldman$elm_css$Css$batch(
 			$rtfeldman$elm_css$Css$px(13)),
 			$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute),
 			$rtfeldman$elm_css$Css$color($author$project$Table$theme.cardWhite),
-			$rtfeldman$elm_css$Css$fontSize(
-			$rtfeldman$elm_css$Css$pct(160)),
+			$author$project$Table$theme.fontSizeButtons,
 			$rtfeldman$elm_css$Css$fontWeight($rtfeldman$elm_css$Css$bold)
 		]));
 var $rtfeldman$elm_css$Css$left = $rtfeldman$elm_css$Css$prop1('left');
@@ -9783,6 +10082,8 @@ var $rtfeldman$elm_css$Html$Styled$Events$onInput = function (tagger) {
 };
 var $rtfeldman$elm_css$Css$padding = $rtfeldman$elm_css$Css$prop1('padding');
 var $rtfeldman$elm_css$Css$paddingRight = $rtfeldman$elm_css$Css$prop1('padding-right');
+var $rtfeldman$elm_css$Css$PercentageUnits = {$: 'PercentageUnits'};
+var $rtfeldman$elm_css$Css$pct = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$PercentageUnits, '%');
 var $rtfeldman$elm_css$VirtualDom$Styled$property = F2(
 	function (key, value) {
 		return A3(
@@ -10138,6 +10439,8 @@ var $rtfeldman$elm_css$VirtualDom$Styled$map = F2(
 		}
 	});
 var $rtfeldman$elm_css$Html$Styled$map = $rtfeldman$elm_css$VirtualDom$Styled$map;
+var $rtfeldman$elm_css$Css$displayFlex = A2($rtfeldman$elm_css$Css$property, 'display', 'flex');
+var $rtfeldman$elm_css$Css$auto = {alignItemsOrAuto: $rtfeldman$elm_css$Css$Structure$Compatible, cursor: $rtfeldman$elm_css$Css$Structure$Compatible, flexBasis: $rtfeldman$elm_css$Css$Structure$Compatible, intOrAuto: $rtfeldman$elm_css$Css$Structure$Compatible, justifyContentOrAuto: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrAuto: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrAutoOrCoverOrContain: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrNumberOrAutoOrNoneOrContent: $rtfeldman$elm_css$Css$Structure$Compatible, overflow: $rtfeldman$elm_css$Css$Structure$Compatible, pointerEvents: $rtfeldman$elm_css$Css$Structure$Compatible, tableLayout: $rtfeldman$elm_css$Css$Structure$Compatible, textRendering: $rtfeldman$elm_css$Css$Structure$Compatible, touchAction: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'auto'};
 var $author$project$Table$cardToFilename = function (card) {
 	var valueCode = function () {
 		if ((card.value < 10) && (card.value > 1)) {
@@ -10191,21 +10494,17 @@ var $rtfeldman$elm_css$Html$Styled$Attributes$src = function (url) {
 	return A2($rtfeldman$elm_css$Html$Styled$Attributes$stringProperty, 'src', url);
 };
 var $author$project$Table$renderCardWithSize = F4(
-	function (cardTopVhPos, cardLeftVwPos, size, url) {
-		var cardsSize = function () {
-			var cardProportion = 0.32;
-			var cardHeight = size;
-			return $rtfeldman$elm_css$Css$batch(
-				_List_fromArray(
-					[
-						$rtfeldman$elm_css$Css$width(
-						$rtfeldman$elm_css$Css$vw(cardProportion * cardHeight)),
-						$rtfeldman$elm_css$Css$height(
-						$rtfeldman$elm_css$Css$vh(cardHeight)),
-						$rtfeldman$elm_css$Css$zIndex(
-						$rtfeldman$elm_css$Css$int(1))
-					]));
-		}();
+	function (cardTopPctPos, cardLeftPctPos, size, url) {
+		var cardsSize = $rtfeldman$elm_css$Css$batch(
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Css$width(
+					$rtfeldman$elm_css$Css$pct(41 * size)),
+					$rtfeldman$elm_css$Css$height(
+					$rtfeldman$elm_css$Css$pct(111.1 * size)),
+					$rtfeldman$elm_css$Css$zIndex(
+					$rtfeldman$elm_css$Css$int(1))
+				]));
 		return A2(
 			$rtfeldman$elm_css$Html$Styled$div,
 			_List_fromArray(
@@ -10216,9 +10515,9 @@ var $author$project$Table$renderCardWithSize = F4(
 							cardsSize,
 							$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute),
 							$rtfeldman$elm_css$Css$left(
-							$rtfeldman$elm_css$Css$vw(cardLeftVwPos)),
+							$rtfeldman$elm_css$Css$pct(cardLeftPctPos)),
 							$rtfeldman$elm_css$Css$top(
-							$rtfeldman$elm_css$Css$vh(cardTopVhPos))
+							$rtfeldman$elm_css$Css$pct(cardTopPctPos))
 						]))
 				]),
 			_List_fromArray(
@@ -10241,9 +10540,9 @@ var $author$project$Table$renderCardWithSize = F4(
 				]));
 	});
 var $author$project$Table$communityCards = function (model) {
-	var size = 14;
-	var offset = 4.5;
-	var flopTop = 39;
+	var size = 0.125;
+	var offset = 5.2;
+	var flopTop = 41;
 	var flopLeft = 37;
 	var riverCards = function () {
 		var _v3 = model.gameState.river;
@@ -10580,6 +10879,7 @@ var $author$project$Table$inGameActions = function (model) {
 				]))
 		]) : _List_Nil;
 };
+var $rtfeldman$elm_css$Css$margin = $rtfeldman$elm_css$Css$prop1('margin');
 var $author$project$Table$NameUpdate = function (a) {
 	return {$: 'NameUpdate', a: a};
 };
@@ -10591,9 +10891,9 @@ var $author$project$Table$playerPositionCss = function (position) {
 		_List_fromArray(
 			[
 				$rtfeldman$elm_css$Css$top(
-				$rtfeldman$elm_css$Css$vh(position.pctTop)),
+				$rtfeldman$elm_css$Css$pct(position.pctTop)),
 				$rtfeldman$elm_css$Css$left(
-				$rtfeldman$elm_css$Css$vw(position.pctLeft)),
+				$rtfeldman$elm_css$Css$pct(position.pctLeft)),
 				$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute)
 			]));
 };
@@ -10612,9 +10912,9 @@ var $author$project$Table$sitButton = F2(
 							$author$project$Table$interactCommonCss,
 							$author$project$Table$playerPositionCss(position),
 							$rtfeldman$elm_css$Css$width(
-							$rtfeldman$elm_css$Css$vw(10)),
+							$rtfeldman$elm_css$Css$pct(12)),
 							$rtfeldman$elm_css$Css$height(
-							$rtfeldman$elm_css$Css$vh(7))
+							$rtfeldman$elm_css$Css$pct(6.5))
 						])),
 					$rtfeldman$elm_css$Html$Styled$Events$onClick(
 					$author$project$Table$EnterName(seatNumber))
@@ -10643,9 +10943,9 @@ var $author$project$Table$renderEmptySit = F3(
 									$author$project$Table$interactCommonCss,
 									$author$project$Table$playerPositionCss(position),
 									$rtfeldman$elm_css$Css$width(
-									$rtfeldman$elm_css$Css$vw(10)),
+									$rtfeldman$elm_css$Css$pct(12)),
 									$rtfeldman$elm_css$Css$height(
-									$rtfeldman$elm_css$Css$vh(7))
+									$rtfeldman$elm_css$Css$pct(6.5))
 								])),
 							A2(
 							$rtfeldman$elm_css$Html$Styled$Events$on,
@@ -11115,8 +11415,8 @@ var $rtfeldman$elm_css$Css$prop4 = F5(
 var $rtfeldman$elm_css$Css$padding4 = $rtfeldman$elm_css$Css$prop4('padding');
 var $rtfeldman$elm_css$Css$relative = {position: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'relative'};
 var $author$project$Table$renderPlayerCard = F3(
-	function (cardTopVhPos, cardLeftVwPos, url) {
-		return A4($author$project$Table$renderCardWithSize, cardTopVhPos, cardLeftVwPos, 12, url);
+	function (cardTopPctPos, cardLeftPctPos, url) {
+		return A4($author$project$Table$renderCardWithSize, cardTopPctPos, cardLeftPctPos, 1, url);
 	});
 var $rtfeldman$elm_css$Css$solid = {borderStyle: $rtfeldman$elm_css$Css$Structure$Compatible, textDecorationStyle: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'solid'};
 var $author$project$Table$renderPlayer = F4(
@@ -11135,9 +11435,9 @@ var $author$project$Table$renderPlayer = F4(
 								_List_fromArray(
 									[
 										$rtfeldman$elm_css$Css$width(
-										$rtfeldman$elm_css$Css$vw(2)),
+										$rtfeldman$elm_css$Css$pct(40)),
 										$rtfeldman$elm_css$Css$height(
-										$rtfeldman$elm_css$Css$vh(10)),
+										$rtfeldman$elm_css$Css$pct(80)),
 										A5(
 										$rtfeldman$elm_css$Css$boxShadow5,
 										$rtfeldman$elm_css$Css$vw(0),
@@ -11150,9 +11450,9 @@ var $author$project$Table$renderPlayer = F4(
 										$rtfeldman$elm_css$Css$border(
 										$rtfeldman$elm_css$Css$px(0)),
 										$rtfeldman$elm_css$Css$top(
-										$rtfeldman$elm_css$Css$vh(-4.8)),
+										$rtfeldman$elm_css$Css$pct(-50)),
 										$rtfeldman$elm_css$Css$left(
-										$rtfeldman$elm_css$Css$vw(-0.5)),
+										$rtfeldman$elm_css$Css$pct(-12.5)),
 										$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute),
 										$rtfeldman$elm_css$Css$zIndex(
 										$rtfeldman$elm_css$Css$int(-1))
@@ -11254,9 +11554,9 @@ var $author$project$Table$renderPlayer = F4(
 						_List_fromArray(
 							[
 								$rtfeldman$elm_css$Css$height(
-								$rtfeldman$elm_css$Css$px(62)),
+								$rtfeldman$elm_css$Css$pct(92)),
 								$rtfeldman$elm_css$Css$width(
-								$rtfeldman$elm_css$Css$px(100)),
+								$rtfeldman$elm_css$Css$pct(100)),
 								$rtfeldman$elm_css$Css$backgroundColor($author$project$Table$theme.tableShade),
 								A4(
 								$rtfeldman$elm_css$Css$padding4,
@@ -11275,9 +11575,9 @@ var $author$project$Table$renderPlayer = F4(
 								$rtfeldman$elm_css$Css$px(5)),
 								$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$absolute),
 								$rtfeldman$elm_css$Css$top(
-								$rtfeldman$elm_css$Css$vh(12.5)),
+								$rtfeldman$elm_css$Css$pct(135.5)),
 								$rtfeldman$elm_css$Css$left(
-								$rtfeldman$elm_css$Css$vw(-3.2)),
+								$rtfeldman$elm_css$Css$pct(-33.6)),
 								$rtfeldman$elm_css$Css$zIndex(
 								$rtfeldman$elm_css$Css$int(-1))
 							]))
@@ -11286,9 +11586,9 @@ var $author$project$Table$renderPlayer = F4(
 					renderCommittedBy,
 					_Utils_ap(renderStack, renderName)))
 			]);
-		var cardsTop = 6;
-		var cardsOffset = 1;
-		var cardsLeft = 1.8;
+		var cardsTop = 60;
+		var cardsOffset = 10.5;
+		var cardsLeft = 20;
 		var backCardUrl = model.hostName + '/static/cards/1B.svg';
 		var renderCards = function (cards) {
 			if (cards.$ === 'Just') {
@@ -11348,6 +11648,10 @@ var $author$project$Table$renderPlayer = F4(
 						[
 							$author$project$Table$playerPositionCss(
 							A2($author$project$Table$offsetPosition, position, avatarOffset)),
+							$rtfeldman$elm_css$Css$width(
+							$rtfeldman$elm_css$Css$pct(10)),
+							$rtfeldman$elm_css$Css$height(
+							$rtfeldman$elm_css$Css$pct(10)),
 							$rtfeldman$elm_css$Css$zIndex(
 							$rtfeldman$elm_css$Css$int(1))
 						]))
@@ -11363,14 +11667,14 @@ var $author$project$Table$renderPlayer = F4(
 								_List_fromArray(
 									[
 										$rtfeldman$elm_css$Css$width(
-										$rtfeldman$elm_css$Css$vw(11)),
+										$rtfeldman$elm_css$Css$pct(12.5 * 10)),
 										$rtfeldman$elm_css$Css$height(
-										$rtfeldman$elm_css$Css$vh(22)),
+										$rtfeldman$elm_css$Css$pct(23 * 10)),
 										$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$relative),
 										$rtfeldman$elm_css$Css$top(
-										$rtfeldman$elm_css$Css$vh(-10)),
+										$rtfeldman$elm_css$Css$pct(-100)),
 										$rtfeldman$elm_css$Css$left(
-										$rtfeldman$elm_css$Css$vw(-5))
+										$rtfeldman$elm_css$Css$pct(-55))
 									]))
 							]),
 						_List_fromArray(
@@ -11454,10 +11758,7 @@ var $author$project$Table$playerSits = function (model) {
 };
 var $author$project$Table$pot = function (model) {
 	var thePot = 1;
-	var shouldDisplay = A2(
-		$elm$core$Debug$log,
-		'hey: ',
-		_Utils_eq(model.tableType, $author$project$Table$Normal));
+	var shouldDisplay = _Utils_eq(model.tableType, $author$project$Table$Normal);
 	return _List_fromArray(
 		[
 			A2(
@@ -11692,8 +11993,7 @@ var $author$project$Table$raiseSlider = function (model) {
 						$author$project$Table$minRaiseAmount(model))),
 					$rtfeldman$elm_css$Html$Styled$Attributes$max(
 					$elm$core$String$fromInt(maxAmount)),
-					$rtfeldman$elm_css$Html$Styled$Attributes$value(
-					A2($elm$core$Debug$log, 'Amount: ', stringAmount)),
+					$rtfeldman$elm_css$Html$Styled$Attributes$value(stringAmount),
 					$rtfeldman$elm_css$Html$Styled$Events$onInput($author$project$Table$UpdateRaiseAmount)
 				]),
 			_List_Nil),
@@ -11726,107 +12026,140 @@ var $rtfeldman$elm_css$Svg$Styled$Attributes$rx = $rtfeldman$elm_css$VirtualDom$
 var $rtfeldman$elm_css$Svg$Styled$Attributes$ry = $rtfeldman$elm_css$VirtualDom$Styled$attribute('ry');
 var $rtfeldman$elm_css$Svg$Styled$svg = $rtfeldman$elm_css$Svg$Styled$node('svg');
 var $rtfeldman$elm_css$Svg$Styled$Attributes$width = $rtfeldman$elm_css$VirtualDom$Styled$attribute('width');
-var $author$project$Table$view = function (model) {
-	return A2(
-		$rtfeldman$elm_css$Html$Styled$div,
-		_List_fromArray(
-			[
-				$rtfeldman$elm_css$Html$Styled$Attributes$css(
-				_List_fromArray(
-					[
-						$rtfeldman$elm_css$Css$zIndex(
-						$rtfeldman$elm_css$Css$int(1)),
-						$rtfeldman$elm_css$Css$backgroundColor($author$project$Table$theme.other),
-						$rtfeldman$elm_css$Css$width(
-						$rtfeldman$elm_css$Css$pct(100)),
-						$rtfeldman$elm_css$Css$height(
-						$rtfeldman$elm_css$Css$pct(100)),
-						$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$relative)
-					]))
-			]),
-		_Utils_ap(
-			$author$project$Table$playerSits(model),
+var $author$project$Table$viewApp = F3(
+	function (model, windowWidth, windowHeight) {
+		var appRatioLegacy = 0.5;
+		var appRatio = appRatioLegacy;
+		var _v0 = _Utils_Tuple2(windowWidth, windowHeight);
+		var wwf = _v0.a;
+		var whf = _v0.b;
+		var windowRatio = whf / wwf;
+		var _v1 = (_Utils_cmp(windowRatio, appRatio) > 0) ? _Utils_Tuple2(wwf, wwf * appRatio) : _Utils_Tuple2(whf / appRatio, whf);
+		var appWidth = _v1.a;
+		var appHeight = _v1.b;
+		return A2(
+			$rtfeldman$elm_css$Html$Styled$div,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$Attributes$css(
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Css$zIndex(
+							$rtfeldman$elm_css$Css$int(1)),
+							$rtfeldman$elm_css$Css$backgroundColor($author$project$Table$theme.other),
+							$rtfeldman$elm_css$Css$width(
+							$rtfeldman$elm_css$Css$px(appWidth)),
+							$rtfeldman$elm_css$Css$height(
+							$rtfeldman$elm_css$Css$px(appHeight)),
+							$rtfeldman$elm_css$Css$position($rtfeldman$elm_css$Css$relative),
+							$rtfeldman$elm_css$Css$margin($rtfeldman$elm_css$Css$auto)
+						]))
+				]),
 			_Utils_ap(
-				$author$project$Table$inGameActions(model),
+				$author$project$Table$playerSits(model),
 				_Utils_ap(
-					$author$project$Table$gameOverActions(model),
+					$author$project$Table$inGameActions(model),
 					_Utils_ap(
-						$author$project$Table$communityCards(model),
+						$author$project$Table$gameOverActions(model),
 						_Utils_ap(
-							$author$project$Table$pot(model),
+							$author$project$Table$communityCards(model),
 							_Utils_ap(
-								$author$project$Table$results(model),
+								$author$project$Table$pot(model),
 								_Utils_ap(
-									$author$project$Table$raiseSlider(model),
-									_List_fromArray(
-										[
-											A2(
-											$rtfeldman$elm_css$Html$Styled$div,
-											_List_fromArray(
-												[
-													$rtfeldman$elm_css$Html$Styled$Attributes$css(
-													_List_fromArray(
-														[
-															$rtfeldman$elm_css$Css$zIndex(
-															$rtfeldman$elm_css$Css$int(2)),
-															$rtfeldman$elm_css$Css$width(
-															$rtfeldman$elm_css$Css$pct(100)),
-															$rtfeldman$elm_css$Css$height(
-															$rtfeldman$elm_css$Css$pct(99.5))
-														]))
-												]),
-											_List_fromArray(
-												[
-													A2(
-													$rtfeldman$elm_css$Svg$Styled$svg,
-													_List_fromArray(
-														[
-															$rtfeldman$elm_css$Svg$Styled$Attributes$width('100%'),
-															$rtfeldman$elm_css$Svg$Styled$Attributes$height('100%')
-														]),
-													_List_fromArray(
-														[
-															A2(
-															$rtfeldman$elm_css$Svg$Styled$ellipse,
-															_List_fromArray(
-																[
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$fill('#3d330cff'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$cx('50%'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$cy('50.5%'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$rx('43.5%'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$ry('32.5%')
-																]),
-															_List_Nil),
-															A2(
-															$rtfeldman$elm_css$Svg$Styled$ellipse,
-															_List_fromArray(
-																[
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$fill('#72b01dff'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$cx('50%'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$cy('50%'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$rx('41%'),
-																	$rtfeldman$elm_css$Svg$Styled$Attributes$ry('30%')
-																]),
-															_List_Nil)
-														]))
-												]))
-										])))))))));
-};
+									$author$project$Table$results(model),
+									_Utils_ap(
+										$author$project$Table$raiseSlider(model),
+										_List_fromArray(
+											[
+												A2(
+												$rtfeldman$elm_css$Html$Styled$div,
+												_List_fromArray(
+													[
+														$rtfeldman$elm_css$Html$Styled$Attributes$css(
+														_List_fromArray(
+															[
+																$rtfeldman$elm_css$Css$zIndex(
+																$rtfeldman$elm_css$Css$int(2)),
+																$rtfeldman$elm_css$Css$width(
+																$rtfeldman$elm_css$Css$pct(100)),
+																$rtfeldman$elm_css$Css$height(
+																$rtfeldman$elm_css$Css$pct(99.5))
+															]))
+													]),
+												_List_fromArray(
+													[
+														A2(
+														$rtfeldman$elm_css$Svg$Styled$svg,
+														_List_fromArray(
+															[
+																$rtfeldman$elm_css$Svg$Styled$Attributes$width('100%'),
+																$rtfeldman$elm_css$Svg$Styled$Attributes$height('100%')
+															]),
+														_List_fromArray(
+															[
+																A2(
+																$rtfeldman$elm_css$Svg$Styled$ellipse,
+																_List_fromArray(
+																	[
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$fill('#3d330cff'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$cx('50%'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$cy('50.5%'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$rx('43.5%'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$ry('32.5%')
+																	]),
+																_List_Nil),
+																A2(
+																$rtfeldman$elm_css$Svg$Styled$ellipse,
+																_List_fromArray(
+																	[
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$fill('#72b01dff'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$cx('50%'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$cy('50%'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$rx('41%'),
+																		$rtfeldman$elm_css$Svg$Styled$Attributes$ry('30%')
+																	]),
+																_List_Nil)
+															]))
+													]))
+											])))))))));
+	});
+var $author$project$Table$view = F3(
+	function (model, windowWidth, windowHeight) {
+		return A2(
+			$rtfeldman$elm_css$Html$Styled$div,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$Attributes$css(
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Css$backgroundColor($author$project$Table$theme.other),
+							$rtfeldman$elm_css$Css$height(
+							$rtfeldman$elm_css$Css$pct(100)),
+							$rtfeldman$elm_css$Css$width(
+							$rtfeldman$elm_css$Css$pct(100)),
+							$rtfeldman$elm_css$Css$displayFlex
+						]))
+				]),
+			_List_fromArray(
+				[
+					A3($author$project$Table$viewApp, model, windowWidth, windowHeight)
+				]));
+	});
 var $author$project$Main$view = function (model) {
-	var _v0 = A2($elm$core$Debug$log, 'The route: ', model.route);
+	var _v0 = model.route;
 	if (_v0.$ === 'Just') {
 		if (_v0.a.$ === 'Drunk') {
 			var _v1 = _v0.a;
 			return A2(
 				$rtfeldman$elm_css$Html$Styled$map,
 				$author$project$Main$TableMsg,
-				$author$project$Table$view(model.table));
+				A3($author$project$Table$view, model.table, model.windowSize.width, model.windowSize.height));
 		} else {
 			var _v2 = _v0.a;
 			return A2(
 				$rtfeldman$elm_css$Html$Styled$map,
 				$author$project$Main$TableMsg,
-				$author$project$Table$view(model.table));
+				A3($author$project$Table$view, model.table, model.windowSize.width, model.windowSize.height));
 		}
 	} else {
 		return $author$project$Main$homepageView(model);
@@ -11849,4 +12182,4 @@ var $author$project$Main$main = $elm$browser$Browser$application(
 		}
 	});
 _Platform_export({'Main':{'init':$author$project$Main$main(
-	$elm$json$Json$Decode$succeed(_Utils_Tuple0))(0)}});}(this));
+	$elm$json$Json$Decode$list($elm$json$Json$Decode$int))(0)}});}(this));

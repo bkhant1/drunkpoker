@@ -5,6 +5,7 @@ import Html.Styled.Events exposing (..)
 import Browser
 import Table exposing (theme, interactCommonCss, ifIsEnter, TableType(..))
 import Browser.Navigation as Navigation
+import Browser.Events
 import Url
 import Url.Builder
 import Html.Styled as Html exposing (Html, li, div, img, input, text, toUnstyled, ul)
@@ -13,7 +14,7 @@ import Css
 import Maybe exposing (withDefault)
 
 
-main : Program () Model Msg
+main : Program (List Int) Model Msg
 main =
   Browser.application
     { init = init
@@ -29,6 +30,12 @@ main =
     }
 
 
+type alias WindowSize =
+    { width: Int
+    , height: Int
+    }
+
+
 type Msg
     = TableMsg Table.Msg
     | SomeUrlChange Browser.UrlRequest
@@ -37,6 +44,7 @@ type Msg
     | GoToDrunkTable
     | NormalTableNameUpdate String
     | GoToNormalTable
+    | WindowSizeChanged Int Int
 
 
 type alias Model =
@@ -46,6 +54,7 @@ type alias Model =
     , drunkTableName: String
     , normalTableName: String
     , homeUrl: String
+    , windowSize: WindowSize
     }
 
 
@@ -58,11 +67,15 @@ maybeSquarred maybeIt =
             Nothing
 
 
-init : () -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
-init _ url key =
+init : List Int -> Url.Url -> Navigation.Key -> (Model, Cmd Msg)
+init wSize url key =
     let
-        tableKey = maybeSquarred <| Debug.log "The url :" <| UP.parse routeParser url
-        (tableModel, theCmd) = Table.init (Url.toString url) (withDefault Drunk tableKey)
+        tableKey = maybeSquarred <| UP.parse routeParser <| Debug.log "Url: " url
+        (tableModel, tableCmd) = Table.init (Url.toString url) (withDefault Drunk tableKey)
+        (width, height) =
+            case wSize of
+                (w::h::_) -> (w, h)
+                _ -> (0, 0)
     in
     ( Model
         tableModel
@@ -71,8 +84,9 @@ init _ url key =
         ""
         ""
         (Url.toString url)
+        (WindowSize width height)
     , Cmd.batch
-        [Cmd.map TableMsg theCmd]
+        [Cmd.map TableMsg tableCmd]
     )
 
 
@@ -87,11 +101,11 @@ routeParser =
 
 view : Model -> Html.Html Msg
 view model =
-    case Debug.log "The route: " model.route of
+    case model.route of
         Just Drunk ->
-            Html.map TableMsg (Table.view model.table)
+            Html.map TableMsg (Table.view model.table model.windowSize.width model.windowSize.height)
         Just Normal ->
-            Html.map TableMsg (Table.view model.table)
+            Html.map TableMsg (Table.view model.table model.windowSize.width model.windowSize.height)
         Nothing ->
             homepageView model
 
@@ -218,16 +232,17 @@ update msg model =
     let
         goToTable tableType =
             let
+                tableName = if tableType == "normal" then model.normalTableName else model.drunkTableName
                 (tableModel, tableCmd) =
                     Table.init
-                        (model.homeUrl ++ tableType ++ "table/" ++ model.drunkTableName)
-                        (withDefault Drunk model.route)
+                        (model.homeUrl ++ tableType ++ "table/" ++ tableName)
+                        (if tableType == "normal" then Normal else Drunk)
             in
             ( { model | table = tableModel }
             , Cmd.batch
                 [ Navigation.pushUrl
                     model.key
-                    <| Url.Builder.absolute [tableType ++ "table", model.drunkTableName] []
+                    <| Url.Builder.absolute [tableType ++ "table", tableName] []
                 , Cmd.map TableMsg tableCmd
                 ]
             )
@@ -237,7 +252,7 @@ update msg model =
             let
                 (tableModel, theCmd) = Table.update it model.table
             in
-            ({ model | table = tableModel }, Cmd.batch [Cmd.map TableMsg <| Debug.log "cmd: " theCmd])
+            ({ model | table = tableModel }, Cmd.batch [Cmd.map TableMsg <| theCmd])
         SomeUrlChange urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
@@ -254,8 +269,15 @@ update msg model =
             goToTable "drinking"
         GoToNormalTable ->
             goToTable "normal"
+        WindowSizeChanged w h ->
+            ( { model | windowSize = WindowSize w h }
+            , Cmd.none
+            )
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.map TableMsg (Table.subscriptions model.table)
+    Sub.batch
+        [ Sub.map TableMsg (Table.subscriptions model.table)
+        , Browser.Events.onResize (\w h -> WindowSizeChanged w h)
+        ]
